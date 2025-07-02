@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react';
 import PageHeader from '../components/Common/PageHeader';
 import DataTable from '../components/Common/DataTable';
@@ -8,15 +8,36 @@ import KanbanView from '../components/Views/KanbanView';
 import GridView from '../components/Views/GridView';
 import TimelineView from '../components/Views/TimelineView';
 import ChartView from '../components/Views/ChartView';
-import { useCRMStore } from '../store/crmStore';
+import { tasksApi, Task } from '../api/services';
 import { ViewType } from '../types';
 import AddNewModal from '../components/Common/AddNewModal';
 
 const Tasks: React.FC = () => {
-  const { tasks, updateTask } = useCRMStore();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('list');
-    const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [defaultType, setDefaultType] = useState<string | null>(null);
+
+  // Fetch tasks data on component mount
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await tasksApi.getAll();
+        setTasks(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
+        console.error('Error fetching tasks:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, []);
 
   const columns = [
     {
@@ -85,6 +106,26 @@ const Tasks: React.FC = () => {
     }
   ];
 
+  const handleUpdateTask = async (id: string, updates: Partial<Task>) => {
+    try {
+      const updatedTask = await tasksApi.update(id, updates);
+      setTasks(prev => prev.map(task => 
+        task.id === id ? updatedTask : task
+      ));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update task');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await tasksApi.delete(id);
+      setTasks(prev => prev.filter(task => task.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete task');
+    }
+  };
+
   const actions = (row: any) => (
     <div className="flex items-center space-x-2">
       <button className="p-1 text-gray-400 hover:text-gray-600">
@@ -95,18 +136,21 @@ const Tasks: React.FC = () => {
       </button>
       <button 
         className="p-1 text-gray-400 hover:text-green-600"
-        onClick={() => updateTask(row.id, { status: 'Completed' })}
+        onClick={() => handleUpdateTask(row.id, { status: 'Completed' })}
       >
         <Icons.Check className="w-4 h-4" />
       </button>
-      <button className="p-1 text-gray-400 hover:text-red-600">
+      <button 
+        className="p-1 text-gray-400 hover:text-red-600"
+        onClick={() => handleDelete(row.id)}
+      >
         <Icons.Trash2 className="w-4 h-4" />
       </button>
     </div>
   );
 
-  const handleTaskMove = (taskId: string, newStatus: string) => {
-    updateTask(taskId, { status: newStatus as any });
+  const handleTaskMove = async (taskId: string, newStatus: string) => {
+    await handleUpdateTask(taskId, { status: newStatus });
   };
 
   const headerActions = (
@@ -163,6 +207,16 @@ const Tasks: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <PageHeader
@@ -174,6 +228,16 @@ const Tasks: React.FC = () => {
         ]}
         actions={headerActions}
       />
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex">
+            <Icons.AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+            <p className="text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -250,13 +314,36 @@ const Tasks: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        {renderContent()}
-      </div>
+      {tasks.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <Icons.CheckSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
+          <p className="text-gray-500 mb-6">Get started by creating your first task.</p>
+          <button
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
+            onClick={() => {
+              setDefaultType('task');
+              setIsModalOpen(true);
+            }}
+          >
+            <Icons.Plus className="w-4 h-4 mr-2" />
+            New Task
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          {renderContent()}
+        </div>
+      )}
+      
       <AddNewModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         defaultType={defaultType}
+        onSuccess={() => {
+          // Refresh tasks data after successful creation
+          tasksApi.getAll().then(setTasks).catch(console.error);
+        }}
       />
     </div>
   );

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import * as Icons from 'lucide-react';
 
 interface PageHeaderProps {
@@ -17,13 +18,26 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, breadcrumbs, a
             {breadcrumbs.map((item, index) => (
               <li key={index} className="flex items-center">
                 {index > 0 && <Icons.ChevronRight className="w-4 h-4 text-gray-400 mx-2" />}
-                <span className={`text-sm ${
-                  index === breadcrumbs.length - 1
-                    ? 'text-gray-900 font-medium'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}>
-                  {item.name}
-                </span>
+                {item.path ? (
+                  <Link
+                    to={item.path}
+                    className={`text-sm transition-colors ${
+                      index === breadcrumbs.length - 1
+                        ? 'text-gray-900 font-medium cursor-default'
+                        : 'text-blue-600 hover:text-blue-800 hover:underline'
+                    }`}
+                  >
+                    {item.name}
+                  </Link>
+                ) : (
+                  <span className={`text-sm ${
+                    index === breadcrumbs.length - 1
+                      ? 'text-gray-900 font-medium'
+                      : 'text-gray-500'
+                  }`}>
+                    {item.name}
+                  </span>
+                )}
               </li>
             ))}
           </ol>

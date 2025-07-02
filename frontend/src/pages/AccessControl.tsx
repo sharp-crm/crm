@@ -13,7 +13,8 @@ const AccessControl: React.FC = () => {
       <PageHeader
         title="Access Control"
         subtitle="Manage user roles and permissions"
-        breadcrumbs={[{ name: 'Settings', path: '/settings' }, { name: 'Access Control' }]}
+        breadcrumbs={[{ name: 'Home', path: '/' },
+          { name: 'Settings' }, { name: 'Access Control' }]}
       />
 
       {/* Add New Employee button (Admins only) */}

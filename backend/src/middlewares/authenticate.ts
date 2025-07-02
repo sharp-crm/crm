@@ -9,7 +9,8 @@ export interface AuthenticatedRequest extends Request {
   user: {
     userId: string;
     email: string;
-    username: string;
+    firstName: string;
+    lastName: string;
     role: string;
     tenantId?: string;
     isDeleted?: boolean;
@@ -42,7 +43,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       }
 
       if (userResult.Item.isDeleted) {
-        res.status(401).json({ error: "User account has been deactivated" });
+        res.status(401).json({ error: "User account has been Soft Deleted" });
         return;
       }
 
@@ -50,7 +51,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       (req as AuthenticatedRequest).user = {
         userId: userResult.Item.userId,
         email: userResult.Item.email,
-        username: userResult.Item.username,
+        firstName: userResult.Item.firstName || '',
+        lastName: userResult.Item.lastName || '',
         role: userResult.Item.role || 'SALES_REP',
         tenantId: userResult.Item.tenantId,
         isDeleted: userResult.Item.isDeleted || false

@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import * as Icons from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from "../store/useAuthStore"; // ✅ import your Zustand store
+import { useAuthStore } from "../store/useAuthStore";
+import { leadsApi, dealsApi, tasksApi, analyticsApi } from "../api/services";
+import { useNotificationStore } from '../store/useNotificationStore';
 
 
 const StatCard = ({ label, value, icon: Icon }: { label: string; value: string | number; icon: React.ElementType }) => (
@@ -36,11 +38,109 @@ const StatusBadge = ({ status }: { status: string }) => {
 const Home: React.FC = () => {
   const today = new Date();
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user); // ✅ get current user
+  const user = useAuthStore((s) => s.user);
+  const { addNotification } = useNotificationStore();
+  
+  // State for real data
+  const [stats, setStats] = useState({
+    openDeals: 0,
+    activeDeals: 0,
+    totalLeads: 0,
+    totalTasks: 0
+  });
+  const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [recentLeads, setRecentLeads] = useState<any[]>([]);
+  const [upcomingDeals, setUpcomingDeals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const [analytics, tasks, leads, deals] = await Promise.all([
+        analyticsApi.getOverview(),
+        tasksApi.getAll(),
+        leadsApi.getAll(),
+        dealsApi.getAll()
+      ]);
+
+      setStats({
+        openDeals: analytics.activeDeals,
+        activeDeals: analytics.deals.active,
+        totalLeads: analytics.totalLeads,
+        totalTasks: analytics.totalTasks
+      });
+
+      // Get recent incomplete tasks
+      const incompleteTasks = tasks
+        .filter(task => task.status !== 'Completed')
+        .slice(0, 3);
+      setRecentTasks(incompleteTasks);
+
+      // Get recent leads (created today or recently)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      
+      const recentLeadsData = leads
+        .filter(lead => {
+          if (!lead.createdAt) return false;
+          const leadDate = new Date(lead.createdAt);
+          // Show leads from the last 7 days
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          return leadDate >= weekAgo;
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 3);
+      setRecentLeads(recentLeadsData);
+
+      // Get deals closing this month
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      const closingDeals = deals
+        .filter(deal => {
+          if (!deal.expectedCloseDate) return false;
+          const closeDate = new Date(deal.expectedCloseDate);
+          return closeDate.getMonth() === currentMonth && 
+                 closeDate.getFullYear() === currentYear &&
+                 deal.stage !== 'Closed Won' && 
+                 deal.stage !== 'Closed Lost';
+        })
+        .sort((a, b) => new Date(a.expectedCloseDate).getTime() - new Date(b.expectedCloseDate).getTime())
+        .slice(0, 3);
+      setUpcomingDeals(closingDeals);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const isOverdue = (dateString: string) => {
-    const dueDate = new Date(dateString.split('/').reverse().join('-'));
+    const dueDate = new Date(dateString);
     return dueDate < today;
+  };
+
+  const handleTestNotification = () => {
+    const notificationTypes = ['success', 'info', 'warning', 'error'];
+    const messages = [
+      { type: 'success', title: 'Deal Closed', message: 'Congratulations! You closed a $50,000 deal with TechCorp.' },
+      { type: 'info', title: 'Meeting Reminder', message: 'You have a client meeting in 30 minutes.' },
+      { type: 'warning', title: 'Task Overdue', message: 'The follow-up task for Global Industries is overdue.' },
+      { type: 'error', title: 'System Alert', message: 'Failed to sync data. Please check your connection.' },
+      { type: 'info', title: 'New Lead', message: 'A new lead "StartupXYZ" has been assigned to you.' }
+    ];
+    
+    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+    addNotification({
+      type: randomMessage.type,
+      title: randomMessage.title,
+      message: randomMessage.message,
+    });
   };
 
   return (
@@ -50,7 +150,7 @@ const Home: React.FC = () => {
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Welcome, {user?.username || 'User'}
+                              Welcome, {`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}
             </h1>
             <p className="text-md text-gray-600 mt-2">
               Today is {today.toLocaleDateString("en-US", {
@@ -80,10 +180,27 @@ const Home: React.FC = () => {
 
       {/* Stats Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="My Open Deals" value="8" icon={Icons.Target} />
-        <StatCard label="My Untouched Deals" value="2" icon={Icons.AlertCircle} />
-        <StatCard label="My Calls Today" value="1" icon={Icons.Phone} />
-        <StatCard label="My Leads" value="11" icon={Icons.Users} />
+        {loading ? (
+          // Loading skeleton
+          Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="bg-white p-6 rounded-xl shadow-md border border-gray-200 animate-pulse">
+              <div className="flex items-center space-x-5">
+                <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-24"></div>
+                  <div className="h-6 bg-gray-200 rounded w-16"></div>
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          <>
+            <StatCard label="Open Deals" value={stats.openDeals} icon={Icons.Target} />
+            <StatCard label="Active Deals" value={stats.activeDeals} icon={Icons.AlertCircle} />
+            <StatCard label="Total Tasks" value={stats.totalTasks} icon={Icons.CheckSquare} />
+            <StatCard label="Total Leads" value={stats.totalLeads} icon={Icons.Users} />
+          </>
+        )}
       </div>
 
       {/* Tasks and Notifications Section */}
@@ -110,43 +227,42 @@ const Home: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  {
-                    subject: "Register for upcoming CRM Webinars",
-                    due: "13/06/2025",
-                    status: "Not Started",
-                    priority: "Low",
-                  },
-                  {
-                    subject: "Refer CRM Videos",
-                    due: "15/06/2025",
-                    status: "In Progress",
-                    priority: "Normal",
-                  },
-                  {
-                    subject: "Competitor Comparison",
-                    due: "11/06/2025",
-                    status: "Not Started",
-                    priority: "Highest",
-                  },
-                ].map((task, index) => (
-                  <tr
-                    key={index}
-                    className={`border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                    }`}
-                    onClick={() => navigate('/tasks')}
-                  >
-                    <td className="py-4 px-6">{task.subject}</td>
-                    <td className={`py-4 px-6 ${isOverdue(task.due) ? "text-red-600 font-medium" : "text-gray-800"}`}>
-                      {task.due}
-                    </td>
-                    <td className="py-4 px-6 text-gray-700">{task.status}</td>
-                    <td className={`py-4 px-6 ${task.priority === "Highest" ? "text-red-600 font-medium" : "text-gray-700"}`}>
-                      {task.priority}
+                {loading ? (
+                  // Loading skeleton for tasks
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <tr key={index} className="border-t border-gray-100 animate-pulse">
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-48"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-20"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-16"></div></td>
+                    </tr>
+                  ))
+                ) : recentTasks.length > 0 ? (
+                  recentTasks.map((task, index) => (
+                    <tr
+                      key={task.id}
+                      className={`border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      }`}
+                      onClick={() => navigate('/tasks')}
+                    >
+                      <td className="py-4 px-6">{task.title}</td>
+                      <td className={`py-4 px-6 ${task.dueDate && isOverdue(task.dueDate) ? "text-red-600 font-medium" : "text-gray-800"}`}>
+                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
+                      </td>
+                      <td className="py-4 px-6 text-gray-700">{task.status}</td>
+                      <td className={`py-4 px-6 ${task.priority === "High" ? "text-red-600 font-medium" : "text-gray-700"}`}>
+                        {task.priority}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 px-6 text-center text-gray-500">
+                      No open tasks found
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -156,12 +272,20 @@ const Home: React.FC = () => {
         <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-semibold text-gray-800">Notifications</h3>
-            <button
-              onClick={() => navigate('/notifications')}
-              className="text-blue-600 hover:text-blue-800 font-medium text-sm underline-offset-4 hover:underline transition-colors"
-            >
-              View All
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={handleTestNotification}
+                className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                <Icons.Plus className="w-4 h-4 inline mr-1" /> Test
+              </button>
+              <button
+                onClick={() => navigate('/notifications')}
+                className="text-blue-600 hover:text-blue-800 font-medium text-sm underline-offset-4 hover:underline transition-colors"
+              >
+                View All
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm table-auto">
@@ -173,35 +297,26 @@ const Home: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  {
-                    message: "New lead assigned: Jason Roy",
-                    timestamp: "15/06/2025 09:30 AM",
-                    type: "Lead",
-                  },
-                  {
-                    message: "Deal stage updated: Website Revamp to Negotiation",
-                    timestamp: "15/06/2025 08:45 AM",
-                    type: "Deal",
-                  },
-                  {
-                    message: "Task overdue: Competitor Comparison",
-                    timestamp: "15/06/2025 07:00 AM",
-                    type: "Task",
-                  },
-                ].map((notification, index) => (
-                  <tr
-                    key={index}
-                    className={`border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                    }`}
-                    onClick={() => navigate('/notifications')}
-                  >
-                    <td className="py-4 px-6 text-gray-800">{notification.message}</td>
-                    <td className="py-4 px-6 text-gray-600">{notification.timestamp}</td>
-                    <td className="py-4 px-6 text-gray-700">{notification.type}</td>
+                {loading ? (
+                  // Loading skeleton for notifications
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <tr key={index} className="border-t border-gray-100 animate-pulse">
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-64"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-16"></div></td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="py-8 px-6 text-center text-gray-500">
+                      <div className="flex flex-col items-center">
+                        <Icons.Bell className="h-8 w-8 text-gray-400 mb-2" />
+                        <p>No recent notifications</p>
+                        <p className="text-sm text-gray-400 mt-1">Notifications will appear here when available</p>
+                      </div>
+                    </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -210,10 +325,10 @@ const Home: React.FC = () => {
 
       {/* Leads and Deals Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Today's Leads */}
+        {/* Recent Leads */}
         <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-semibold text-gray-800">Today's Leads</h3>
+            <h3 className="text-xl font-semibold text-gray-800">Recent Leads</h3>
             <button
               onClick={() => navigate('/leads')}
               className="text-blue-600 hover:text-blue-800 font-medium text-sm underline-offset-4 hover:underline transition-colors"
@@ -232,33 +347,42 @@ const Home: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  {
-                    name: "Jason Roy",
-                    email: "jason.roy@alpha.com",
-                    phone: "+91 99999 88888",
-                    company: "Alpha Tech",
-                  },
-                  {
-                    name: "Priya Singh",
-                    email: "priya.singh@neutron.com",
-                    phone: "+91 98765 43210",
-                    company: "Neutron Corp",
-                  },
-                ].map((lead, index) => (
-                  <tr
-                    key={index}
-                    className={`border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                    }`}
-                    onClick={() => navigate('/leads')}
-                  >
-                    <td className="py-4 px-6 text-gray-800">{lead.name}</td>
-                    <td className="py-4 px-6 text-gray-600">{lead.email}</td>
-                    <td className="py-4 px-6 text-gray-600">{lead.phone}</td>
-                    <td className="py-4 px-6 text-gray-700">{lead.company}</td>
+                {loading ? (
+                  // Loading skeleton for leads
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <tr key={index} className="border-t border-gray-100 animate-pulse">
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-48"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-28"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
+                    </tr>
+                  ))
+                ) : recentLeads.length > 0 ? (
+                  recentLeads.map((lead, index) => (
+                    <tr
+                      key={lead.id}
+                      className={`border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      }`}
+                      onClick={() => navigate('/leads')}
+                    >
+                      <td className="py-4 px-6 text-gray-800">{lead.firstName} {lead.lastName}</td>
+                      <td className="py-4 px-6 text-gray-600">{lead.email}</td>
+                      <td className="py-4 px-6 text-gray-600">{lead.phone || 'N/A'}</td>
+                      <td className="py-4 px-6 text-gray-700">{lead.company || 'N/A'}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 px-6 text-center text-gray-500">
+                      <div className="flex flex-col items-center">
+                        <Icons.Users className="h-8 w-8 text-gray-400 mb-2" />
+                        <p>No recent leads</p>
+                        <p className="text-sm text-gray-400 mt-1">Recent leads will appear here</p>
+                      </div>
+                    </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -286,33 +410,44 @@ const Home: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  {
-                    name: "Website Revamp",
-                    account: "Neo Systems",
-                    stage: "Negotiation",
-                    closeDate: "25/06/2025",
-                  },
-                  {
-                    name: "CRM Onboarding",
-                    account: "Triton Tech",
-                    stage: "Proposal",
-                    closeDate: "29/06/2025",
-                  },
-                ].map((deal, index) => (
-                  <tr
-                    key={index}
-                    className={`border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                    }`}
-                    onClick={() => navigate('/deals')}
-                  >
-                    <td className="py-4 px-6 text-gray-800">{deal.name}</td>
-                    <td className="py-4 px-6 text-gray-700">{deal.account}</td>
-                    <td className="py-4 px-6"><StatusBadge status={deal.stage} /></td>
-                    <td className="py-4 px-6 text-gray-600">{deal.closeDate}</td>
+                {loading ? (
+                  // Loading skeleton for deals
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <tr key={index} className="border-t border-gray-100 animate-pulse">
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-36"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-28"></div></td>
+                      <td className="py-4 px-6"><div className="h-6 bg-gray-200 rounded w-20"></div></td>
+                      <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
+                    </tr>
+                  ))
+                ) : upcomingDeals.length > 0 ? (
+                  upcomingDeals.map((deal, index) => (
+                    <tr
+                      key={deal.id}
+                      className={`border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      }`}
+                      onClick={() => navigate('/deals')}
+                    >
+                      <td className="py-4 px-6 text-gray-800">{deal.title}</td>
+                      <td className="py-4 px-6 text-gray-700">{deal.account || 'N/A'}</td>
+                      <td className="py-4 px-6"><StatusBadge status={deal.stage} /></td>
+                      <td className="py-4 px-6 text-gray-600">
+                        {deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : 'N/A'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 px-6 text-center text-gray-500">
+                      <div className="flex flex-col items-center">
+                        <Icons.Target className="h-8 w-8 text-gray-400 mb-2" />
+                        <p>No deals closing this month</p>
+                        <p className="text-sm text-gray-400 mt-1">Deals with close dates this month will appear here</p>
+                      </div>
+                    </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

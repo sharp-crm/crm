@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import * as Icons from 'lucide-react';
 import { useCRMStore } from '../../store/crmStore';
+import AddNewUserModal from '../AddNewUserModal';
+import PhoneNumberInput from './PhoneNumberInput';
 
 interface AddNewModalProps {
   isOpen: boolean;
@@ -12,9 +14,11 @@ interface AddNewModalProps {
 const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType }) => {
   const [selectedType, setSelectedType] = useState<string>();
   const [formData, setFormData] = useState<Record<string, any>>({});
-  const { addLead, addContact, addAccount, addDeal, addTask, addDealer, addSubsidiary } = useCRMStore();
+  const [showUserModal, setShowUserModal] = useState(false);
+  const { addLead, addContact, addDeal, addTask, addDealer, addSubsidiary } = useCRMStore();
 
   const recordTypes = [
+    { id: 'user', name: 'User', icon: 'UserCog', description: 'A new team member or admin' },
     { id: 'lead', name: 'Lead', icon: 'UserPlus', description: 'A potential customer' },
     { id: 'contact', name: 'Contact', icon: 'User', description: 'A person you do business with' },
     { id: 'deal', name: 'Deal', icon: 'Target', description: 'A sales opportunity' },
@@ -26,8 +30,46 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType 
   useEffect(() => {
     if (isOpen && defaultType) {
       setSelectedType(defaultType);
+      if (defaultType === 'user') {
+        setShowUserModal(true);
+      }
     }
   }, [isOpen, defaultType]);
+
+  const handleTypeSelection = (typeId: string) => {
+    if (typeId === 'user') {
+      setShowUserModal(true);
+    } else {
+      setSelectedType(typeId);
+    }
+  };
+
+  const handleBackToSelection = () => {
+    setSelectedType('');
+    setFormData({});
+    setShowUserModal(false);
+  };
+
+  const handleUserModalClose = () => {
+    // Instead of closing completely, go back to selection
+    handleBackToSelection();
+  };
+
+  const handleMainModalClose = () => {
+    // Reset everything and close
+    setSelectedType('');
+    setFormData({});
+    setShowUserModal(false);
+    onClose();
+  };
+
+  const handleUserAdded = () => {
+    // User was successfully created, close everything
+    setShowUserModal(false);
+    setSelectedType('');
+    setFormData({});
+    onClose();
+  };
 
   const getFormFields = () => {
     const leadSourceOptions = [
@@ -129,37 +171,91 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newRecord = {
+    const baseRecord = {
       id: Date.now().toString(),
-      ...formData,
       createdAt: new Date().toISOString().split('T')[0]
     };
 
     switch (selectedType) {
       case 'lead':
-        addLead({ ...newRecord, status: 'New' });
+        addLead({
+          ...baseRecord,
+          name: `${formData.firstName} ${formData.lastName}`,
+          company: formData.company,
+          email: formData.email,
+          phone: formData.phone || '',
+          status: 'New',
+          source: formData.leadSource || 'Direct',
+          value: 0
+        });
         break;
       case 'contact':
-        addContact({ ...newRecord, status: 'Active' });
+        addContact({
+          ...baseRecord,
+          name: formData.firstName,
+          email: formData.email,
+          phone: formData.phone || '',
+          company: formData.accountName,
+          position: formData.title || '',
+          status: 'Active'
+        });
         break;
       case 'deal':
-        addDeal({ ...newRecord, stage: 'Prospecting', owner: 'Current User' });
+        addDeal({
+          ...baseRecord,
+          name: formData.dealName,
+          account: formData.account || 'Unknown',
+          value: formData.amount || 0,
+          stage: 'Prospecting',
+          probability: 25,
+          closeDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          owner: formData.dealOwner || 'Current User'
+        });
         break;
       case 'task':
-        addTask({ ...newRecord, status: 'Open' });
+        addTask({
+          ...baseRecord,
+          title: formData.subject,
+          description: formData.description || '',
+          priority: 'Medium',
+          status: 'Open',
+          dueDate: formData.dueDate,
+          assignee: formData.taskOwner || 'Current User',
+          type: 'Follow-up'
+        });
         break;
       case 'dealer':
-        addDealer?.({ ...newRecord });
+        addDealer?.({
+          ...baseRecord,
+          name: formData.name,
+          email: formData.email || '',
+          phone: formData.contact || '',
+          company: formData.name,
+          location: formData.address || '',
+          territory: formData.subsidiary || '',
+          status: 'Active',
+          tenantId: '',
+          updatedAt: baseRecord.createdAt
+        });
         break;
       case 'subsidiary':
-        addSubsidiary?.({ ...newRecord });
+        addSubsidiary?.({
+          ...baseRecord,
+          name: formData.name,
+          email: formData.email || '',
+          address: formData.address,
+          contact: formData.contact || '',
+          totalEmployees: formData.totalEmployees || 0,
+          tenantId: '',
+          updatedAt: baseRecord.createdAt
+        });
         break;
     }
 
-    console.log(`Created new ${selectedType}:`, newRecord);
+    console.log(`Created new ${selectedType}`);
     setFormData({});
     setSelectedType('');
-    onClose();
+    handleMainModalClose();
   };
 
   const formFields = getFormFields();
@@ -173,7 +269,8 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType 
   }, {} as Record<string, typeof formFields>);
 
   return (
-    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+    <>
+      <Dialog open={isOpen && !showUserModal} onClose={handleMainModalClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       
       <div className="fixed inset-0 flex items-center justify-center p-4">
@@ -183,7 +280,7 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType 
               Add New Record
             </Dialog.Title>
             <button
-              onClick={onClose}
+              onClick={handleMainModalClose}
               className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <Icons.X className="w-5 h-5 text-gray-500" />
@@ -203,7 +300,7 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType 
                       <button
                         key={type.id}
                         type="button"
-                        onClick={() => setSelectedType(type.id)}
+                        onClick={() => handleTypeSelection(type.id)}
                         className="p-4 border-2 border-gray-200 rounded-lg text-left hover:border-gray-300 hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex items-center mb-2">
@@ -221,10 +318,7 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType 
                 <div className="mb-6">
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedType('');
-                      setFormData({});
-                    }}
+                    onClick={handleBackToSelection}
                     className="flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
                   >
                     <Icons.ArrowLeft className="w-4 h-4 mr-1" />
@@ -274,14 +368,19 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType 
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               placeholder={`Enter ${field.label.toLowerCase()}...`}
                             />
+                          ) : field.type === 'tel' ? (
+                            <PhoneNumberInput
+                              value={formData[field.name] || ''}
+                              onChange={(phoneNumber) => handleInputChange(field.name, phoneNumber)}
+                              placeholder={`Enter ${field.label.toLowerCase()}...`}
+                              className="w-full"
+                            />
                           ) : (
                             <input
                               type={field.type}
                               value={formData[field.name] || ''}
                               onChange={(e) => handleInputChange(field.name, field.type === 'number' ? Number(e.target.value) : e.target.value)}
                               required={field.required}
-                              min={field.min}
-                              max={field.max}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               placeholder={`Enter ${field.label.toLowerCase()}...`}
                             />
@@ -298,7 +397,7 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType 
               <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleMainModalClose}
                   className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancel
@@ -315,6 +414,13 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType 
         </Dialog.Panel>
       </div>
     </Dialog>
+
+    <AddNewUserModal
+      isOpen={showUserModal}
+      onClose={handleUserModalClose}
+      onUserAdded={handleUserAdded}
+    />
+    </>
   );
 };
 

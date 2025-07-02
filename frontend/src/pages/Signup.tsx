@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import '../index.css';
+import PhoneNumberInput from '../components/Common/PhoneNumberInput';
+import DatePicker from '../components/Common/DatePicker';
 
 const Signup: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -94,14 +96,12 @@ const Signup: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-            <input
-              type="tel"
-              name="phoneNumber"
+            <PhoneNumberInput
               value={formData.phoneNumber}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
-              placeholder="+1234567890"
+              onChange={(phoneNumber) => setFormData(prev => ({ ...prev, phoneNumber }))}
+              placeholder="Enter phone number"
               required
+              className="w-full"
             />
           </div>
           <div>
@@ -119,14 +119,13 @@ const Signup: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-            <input
-              type="date"
-              name="dateOfBirth"
+            <DatePicker
               value={formData.dateOfBirth}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+              onChange={(date) => setFormData(prev => ({ ...prev, dateOfBirth: date }))}
+              placeholder="Select your date of birth"
+              label="Date of Birth"
               required
+              className="w-full"
             />
           </div>
           <button

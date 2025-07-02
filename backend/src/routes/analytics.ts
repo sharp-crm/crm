@@ -333,13 +333,13 @@ router.get("/team", async (req, res, next) => {
 
     // Performance by user
     const userPerformance = users.map(user => {
-      const userDeals = deals.filter(d => d.owner === user.username);
-      const userTasks = tasks.filter(t => t.assignee === user.username);
+      const userDeals = deals.filter(d => d.owner === user.email);
+      const userTasks = tasks.filter(t => t.assignee === user.email);
       const completedTasks = userTasks.filter(t => t.status === 'Completed');
       const wonDeals = userDeals.filter(d => d.stage === 'Closed Won');
       
       return {
-        name: user.username,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
         email: user.email,
         role: user.role,
         deals: userDeals.length,

@@ -278,7 +278,6 @@ async function createSuperAdmin(): Promise<void> {
       userId,
       email,
       password: hashedPassword,
-      username: "John Sharp",
       firstName: "John",
       lastName: "Sharp",
       role: "SUPER_ADMIN", // Changed from ADMIN to SUPER_ADMIN

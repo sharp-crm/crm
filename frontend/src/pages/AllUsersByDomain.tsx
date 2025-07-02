@@ -3,14 +3,12 @@ import API from '../api/client';
 import PageHeader from '../components/Common/PageHeader';
 import { useAuthStore } from '../store/useAuthStore';
 import AddNewUserModal from '../components/AddNewUserModal';
-import EditUserModal from '../components/EditUserModal';
 
 interface User {
   lastName: string;
   firstName: string;
   id: string;
   name: string;
-  username: string;
   email: string;
   role: string;
   phoneNumber?: string;
@@ -40,8 +38,6 @@ const AllUsers: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
   const accessToken = useAuthStore((s) => s.accessToken);
   const currentUser = useAuthStore((s) => s.user);
   const domain = useAuthStore((s) => s.user?.email?.split('@')[1]);
@@ -70,7 +66,8 @@ const AllUsers: React.FC = () => {
     }
   };
 
-  const handleSoftDelete = async (userId: string, userName: string) => {
+  const handleSoftDelete = async (userId: string, firstName: string, lastName: string) => {
+    const userName = `${firstName} ${lastName}`;
     // Show confirmation dialog
     const isConfirmed = window.confirm(
       `Are you sure you want to delete ${userName}? This action cannot be undone.`
@@ -95,12 +92,6 @@ const AllUsers: React.FC = () => {
       alert(`Error: ${errorMessage}`);
     }
   };
-
-  const handleEditUser = (user: User) => {
-    setEditingUser(user);
-    setIsEditModalOpen(true);
-  };
-
 
   useEffect(() => {
     fetchUsers();
@@ -176,17 +167,16 @@ const AllUsers: React.FC = () => {
                       ))}
                     </div>
 
-                    {(useAuthStore.getState().user?.role === 'ADMIN' || useAuthStore.getState().user?.role === 'SUPER_ADMIN') && (
+                    {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN') && (
                       <div className="mt-3 flex gap-4">
-                        <button
-                          onClick={() => handleEditUser(user)}
-                          className="text-sm text-blue-600 hover:underline"
-                        >
-                          Edit
-                        </button>
-                        {useAuthStore.getState().user?.id !== user.id && (
+                        {/* Show delete button only if:
+                            1. User is not the currently logged-in user
+                            2. User is not the super admin (john@sharp.com)
+                        */}
+                        {currentUser?.userId !== user.id && 
+                         user.email !== 'john@sharp.com' && (
                           <button
-                            onClick={() => handleSoftDelete(user.id, `${user.firstName} ${user.lastName}`)}
+                            onClick={() => handleSoftDelete(user.id, user.firstName, user.lastName)}
                             className="text-sm text-red-600 hover:underline"
                           >
                             Delete
@@ -209,20 +199,6 @@ const AllUsers: React.FC = () => {
           fetchUsers();
           setIsModalOpen(false);
         }}
-      />
-
-      <EditUserModal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingUser(null);
-        }}
-        onUserUpdated={() => {
-          fetchUsers();
-          setIsEditModalOpen(false);
-          setEditingUser(null);
-        }}
-        user={editingUser}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
-import { PutCommand, GetCommand, ScanCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "../services/dynamoClient";
 import { v4 as uuidv4 } from "uuid";
 
@@ -12,17 +12,36 @@ interface Deal {
   probability: number;
   closeDate: string;
   owner: string;
+  tenantId: string;
   createdAt: string;
+}
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    userId: string;
+    tenantId: string;
+    role: string;
+  };
 }
 
 const router = express.Router();
 
-// Get all deals
-router.get("/", (async (_req: Request, res: Response, next: NextFunction) => {
+// Get all deals for tenant
+router.get("/", (async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ error: "Tenant ID required" });
+    }
+
     const result = await docClient.send(
-      new ScanCommand({
-        TableName: "Deals"
+      new QueryCommand({
+        TableName: "Deals",
+        IndexName: "TenantIdIndex",
+        KeyConditionExpression: "tenantId = :tenantId",
+        ExpressionAttributeValues: {
+          ":tenantId": tenantId
+        }
       })
     );
 
@@ -32,10 +51,15 @@ router.get("/", (async (_req: Request, res: Response, next: NextFunction) => {
   }
 }) as express.RequestHandler);
 
-// Get deal by ID
-router.get("/:id", (async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+// Get deal by ID (tenant-aware)
+router.get("/:id", (async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const tenantId = req.user?.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "Tenant ID required" });
+    }
     
     const result = await docClient.send(
       new GetCommand({
@@ -48,6 +72,11 @@ router.get("/:id", (async (req: Request<{ id: string }>, res: Response, next: Ne
       return res.status(404).json({ error: "Deal not found" });
     }
 
+    // Check if deal belongs to the same tenant
+    if (result.Item.tenantId !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     res.json({ data: result.Item as Deal });
   } catch (error) {
     next(error);
@@ -55,7 +84,7 @@ router.get("/:id", (async (req: Request<{ id: string }>, res: Response, next: Ne
 }) as express.RequestHandler);
 
 // Create new deal
-router.post("/", (async (req: Request, res: Response, next: NextFunction) => {
+router.post("/", (async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { 
       name, 
@@ -66,6 +95,12 @@ router.post("/", (async (req: Request, res: Response, next: NextFunction) => {
       closeDate, 
       owner 
     } = req.body;
+    const tenantId = req.user?.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "Tenant ID required" });
+    }
+
     const id = uuidv4();
     const createdAt = new Date().toISOString();
 
@@ -78,6 +113,7 @@ router.post("/", (async (req: Request, res: Response, next: NextFunction) => {
       probability: Number(probability) || 0,
       closeDate,
       owner,
+      tenantId,
       createdAt
     };
 
@@ -95,10 +131,27 @@ router.post("/", (async (req: Request, res: Response, next: NextFunction) => {
 }) as express.RequestHandler);
 
 // Update deal
-router.put("/:id", (async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+router.put("/:id", (async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const tenantId = req.user?.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "Tenant ID required" });
+    }
+
+    // First check if deal exists and belongs to tenant
+    const existingDeal = await docClient.send(
+      new GetCommand({
+        TableName: "Deals",
+        Key: { id }
+      })
+    );
+
+    if (!existingDeal.Item || existingDeal.Item.tenantId !== tenantId) {
+      return res.status(404).json({ error: "Deal not found" });
+    }
     
     // Build update expression
     const updateExpressions = [];
@@ -106,7 +159,7 @@ router.put("/:id", (async (req: Request<{ id: string }>, res: Response, next: Ne
     const expressionAttributeValues: Record<string, any> = {};
     
     for (const [key, value] of Object.entries(updates)) {
-      if (key !== 'id') {
+      if (key !== 'id' && key !== 'tenantId') {
         updateExpressions.push(`#${key} = :${key}`);
         expressionAttributeNames[`#${key}`] = key;
         expressionAttributeValues[`:${key}`] = key === 'value' || key === 'probability' 
@@ -137,9 +190,26 @@ router.put("/:id", (async (req: Request<{ id: string }>, res: Response, next: Ne
 }) as express.RequestHandler);
 
 // Delete deal
-router.delete("/:id", (async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+router.delete("/:id", (async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const tenantId = req.user?.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "Tenant ID required" });
+    }
+
+    // First check if deal exists and belongs to tenant
+    const existingDeal = await docClient.send(
+      new GetCommand({
+        TableName: "Deals",
+        Key: { id }
+      })
+    );
+
+    if (!existingDeal.Item || existingDeal.Item.tenantId !== tenantId) {
+      return res.status(404).json({ error: "Deal not found" });
+    }
 
     await docClient.send(
       new DeleteCommand({

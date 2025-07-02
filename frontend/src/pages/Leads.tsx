@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react';
 import PageHeader from '../components/Common/PageHeader';
 import DataTable from '../components/Common/DataTable';
 import StatusBadge from '../components/Common/StatusBadge';
-import { mockLeads } from '../data/mockData';
+import { leadsApi, Lead } from '../api/services';
 import AddNewModal from '../components/Common/AddNewModal';
 
 const Leads: React.FC = () => {
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [defaultType, setDefaultType] = useState<string | null>(null);
 
@@ -17,8 +20,36 @@ const Leads: React.FC = () => {
     leadSource: false
   });
 
+  // Fetch leads data on component mount
+  useEffect(() => {
+    const fetchLeads = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await leadsApi.getAll();
+        setLeads(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch leads');
+        console.error('Error fetching leads:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeads();
+  }, []);
+
   const handleCheckboxChange = (key: keyof typeof filters) => {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await leadsApi.delete(id);
+      setLeads(prev => prev.filter(lead => lead.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete lead');
+    }
   };
 
   const columns = [
@@ -73,7 +104,10 @@ const Leads: React.FC = () => {
       <button className="p-1 text-gray-400 hover:text-gray-600">
         <Icons.Edit2 className="w-4 h-4" />
       </button>
-      <button className="p-1 text-gray-400 hover:text-red-600">
+      <button 
+        className="p-1 text-gray-400 hover:text-red-600"
+        onClick={() => handleDelete(row.id)}
+      >
         <Icons.Trash2 className="w-4 h-4" />
       </button>
     </div>
@@ -94,6 +128,29 @@ const Leads: React.FC = () => {
       </button>
     </>
   );
+
+  const getStatusCounts = () => {
+    const counts = {
+      total: leads.length,
+      new: leads.filter(lead => lead.status === 'New').length,
+      qualified: leads.filter(lead => lead.status === 'Qualified').length,
+      contacted: leads.filter(lead => lead.status === 'Contacted').length
+    };
+    return counts;
+  };
+
+  const statusCounts = getStatusCounts();
+  const totalValue = leads.reduce((sum, lead) => sum + lead.value, 0);
+
+  if (loading) {
+    return (
+      <div className="p-6 lg:p-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 lg:p-8 overflow-x-auto">
@@ -183,6 +240,16 @@ const Leads: React.FC = () => {
             actions={headerActions}
           />
 
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex">
+                <Icons.AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+                <p className="text-red-700">{error}</p>
+              </div>
+            </div>
+          )}
+
           {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-white shadow-sm rounded-xl p-5 border border-gray-200">
@@ -192,72 +259,81 @@ const Leads: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Total Leads</p>
-                  <p className="text-xl font-semibold text-gray-900">{mockLeads.length}</p>
+                  <p className="text-xl font-semibold text-gray-900">{statusCounts.total}</p>
                 </div>
               </div>
             </div>
             <div className="bg-white shadow-sm rounded-xl p-5 border border-gray-200">
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                  <Icons.UserPlus className="w-5 h-5 text-green-600" />
+                  <Icons.UserCheck className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Qualified</p>
+                  <p className="text-xl font-semibold text-gray-900">{statusCounts.qualified}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white shadow-sm rounded-xl p-5 border border-gray-200">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
+                  <Icons.UserPlus className="w-5 h-5 text-yellow-600" />
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">New Leads</p>
-                  <p className="text-xl font-semibold text-gray-900">
-                    {mockLeads.filter(lead => lead.status === 'New').length}
-                  </p>
+                  <p className="text-xl font-semibold text-gray-900">{statusCounts.new}</p>
                 </div>
               </div>
             </div>
             <div className="bg-white shadow-sm rounded-xl p-5 border border-gray-200">
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                  <Icons.CheckCircle className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Converted Leads</p>
-                  <p className="text-xl font-semibold text-gray-900">
-                    {mockLeads.filter(lead => lead.status === 'Converted').length}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white shadow-sm rounded-xl p-5 border border-gray-200">
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
-                  <Icons.DollarSign className="w-5 h-5 text-orange-600" />
+                  <Icons.DollarSign className="w-5 h-5 text-purple-600" />
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Total Value</p>
-                  <p className="text-xl font-semibold text-gray-900">
-                    ${mockLeads.reduce((sum, lead) => sum + lead.value, 0).toLocaleString()}
-                  </p>
+                  <p className="text-xl font-semibold text-gray-900">${totalValue.toLocaleString()}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Table Section */}
-          <div className="mt-8 bg-white shadow-sm rounded-xl border border-gray-200">
-            <div className="p-6">
-              <DataTable
-                columns={columns}
-                data={mockLeads}
-                actions={actions}
-                onRowClick={(lead) => console.log('View lead:', lead)}
-                className="min-w-full"
-                rowClassName="hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 py-3"
-              />
+          {/* Data Table */}
+          {leads.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+              <Icons.Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
+              <p className="text-gray-500 mb-6">Get started by creating your first lead.</p>
+              <button
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
+                onClick={() => {
+                  setDefaultType('lead');
+                  setIsModalOpen(true);
+                }}
+              >
+                <Icons.Plus className="w-4 h-4 mr-2" />
+                New Lead
+              </button>
             </div>
-          </div>
+          ) : (
+            <DataTable
+              data={leads}
+              columns={columns}
+              actions={actions}
+            />
+          )}
         </div>
       </div>
 
-      {/* Add Modal */}
+      {/* Add New Modal */}
       <AddNewModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         defaultType={defaultType}
+        onSuccess={() => {
+          // Refresh leads data after successful creation
+          leadsApi.getAll().then(setLeads).catch(console.error);
+        }}
       />
     </div>
   );

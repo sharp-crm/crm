@@ -75,7 +75,7 @@ router.post("/", async (req, res, next) => {
       employees: Number(employees) || 0,
       website,
       status,
-      owner: owner || (req as any).user?.username,
+      owner: owner || (req as any).user?.email,
       address,
       phone,
       email,

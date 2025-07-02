@@ -11,7 +11,7 @@ const router = Router();
 // Register new user
 const register: RequestHandler = async (req, res, next) => {
   try {
-    const { email, password, username, firstName, lastName, role, phoneNumber } = req.body;
+    const { email, password, firstName, lastName, role, phoneNumber } = req.body;
 
     // Check if user already exists
     const existingUser = await docClient.send(new GetCommand({
@@ -36,7 +36,6 @@ const register: RequestHandler = async (req, res, next) => {
       userId,
       email,
       password: hashedPassword,
-      username,
       firstName,
       lastName,
       role,
@@ -64,7 +63,6 @@ const register: RequestHandler = async (req, res, next) => {
       user: {
         userId,
         email,
-        username,
         firstName,
         lastName,
         role,
@@ -96,6 +94,12 @@ const login: RequestHandler = async (req, res, next) => {
       return;
     }
 
+    // Check if user is soft deleted
+    if (user.isDeleted) {
+      res.status(401).json({ message: "No user found" });
+      return;
+    }
+
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
 
@@ -123,7 +127,6 @@ const login: RequestHandler = async (req, res, next) => {
       user: {
         userId: user.userId,
         email: user.email,
-        username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
@@ -151,18 +154,36 @@ const refresh: RequestHandler = async (req, res, next) => {
     try {
       const decoded = await verifyRefreshToken(refreshToken);
 
-      // Generate new access token
+      // Verify user still exists and is not soft deleted
+      const userResult = await docClient.send(new GetCommand({
+        TableName: "Users",
+        Key: { email: decoded.email }
+      }));
+
+      const user = userResult.Item;
+
+      if (!user) {
+        res.status(401).json({ message: "User not found" });
+        return;
+      }
+
+      if (user.isDeleted) {
+        res.status(401).json({ message: "No user found" });
+        return;
+      }
+
+      // Generate new access token with current user data
       const accessToken = generateAccessToken({
-        userId: decoded.userId,
-        email: decoded.email,
-        role: decoded.role,
-        tenantId: decoded.tenantId
+        userId: user.userId,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId
       });
 
       // Generate new refresh token
       const newRefreshToken = await generateRefreshToken({
-        userId: decoded.userId,
-        email: decoded.email
+        userId: user.userId,
+        email: user.email
       });
 
       // Invalidate old refresh token
@@ -200,16 +221,14 @@ const updateProfile: RequestHandler = async (req, res, next) => {
     const result = await docClient.send(new UpdateCommand({
       TableName: "Users",
       Key: { userId },
-      UpdateExpression: "set #username = :username, #firstName = :firstName, #lastName = :lastName, #phoneNumber = :phoneNumber, #updatedAt = :updatedAt",
+      UpdateExpression: "set #firstName = :firstName, #lastName = :lastName, #phoneNumber = :phoneNumber, #updatedAt = :updatedAt",
       ExpressionAttributeNames: {
-        "#username": "username",
         "#firstName": "firstName",
         "#lastName": "lastName",
         "#phoneNumber": "phoneNumber",
         "#updatedAt": "updatedAt"
       },
       ExpressionAttributeValues: {
-        ":username": updateData.username,
         ":firstName": updateData.firstName,
         ":lastName": updateData.lastName,
         ":phoneNumber": updateData.phoneNumber,
@@ -228,7 +247,6 @@ const updateProfile: RequestHandler = async (req, res, next) => {
       user: {
         userId: result.Attributes.userId,
         email: result.Attributes.email,
-        username: result.Attributes.username,
         firstName: result.Attributes.firstName,
         lastName: result.Attributes.lastName,
         role: result.Attributes.role,
@@ -321,7 +339,6 @@ const getProfile: RequestHandler = async (req, res, next) => {
       user: {
         userId: user.userId,
         email: user.email,
-        username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
