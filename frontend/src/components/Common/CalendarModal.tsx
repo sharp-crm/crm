@@ -13,6 +13,11 @@ const CalendarModal: React.FC<CalendarModalProps> = ({ isOpen, onClose }) => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
 
+  // Year range constants
+  const currentYear = new Date().getFullYear();
+  const minYear = currentYear - 125;
+  const maxYear = currentYear + 50;
+
   const mockEvents: CalendarEvent[] = [
     {
       id: '1',
@@ -53,6 +58,39 @@ const CalendarModal: React.FC<CalendarModalProps> = ({ isOpen, onClose }) => {
       type: 'task'
     }
   ];
+
+  // Helper function to check if a date is within allowed range
+  const isDateInRange = (date: Date) => {
+    const year = date.getFullYear();
+    return year >= minYear && year <= maxYear;
+  };
+
+  // Helper function to generate year options
+  const getYearOptions = () => {
+    const years = [];
+    for (let year = maxYear; year >= minYear; year--) {
+      years.push(year);
+    }
+    return years;
+  };
+
+  // Helper function to generate month options
+  const getMonthOptions = () => {
+    return [
+      { value: 0, label: 'January' },
+      { value: 1, label: 'February' },
+      { value: 2, label: 'March' },
+      { value: 3, label: 'April' },
+      { value: 4, label: 'May' },
+      { value: 5, label: 'June' },
+      { value: 6, label: 'July' },
+      { value: 7, label: 'August' },
+      { value: 8, label: 'September' },
+      { value: 9, label: 'October' },
+      { value: 10, label: 'November' },
+      { value: 11, label: 'December' }
+    ];
+  };
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -104,30 +142,91 @@ const CalendarModal: React.FC<CalendarModalProps> = ({ isOpen, onClose }) => {
   };
 
   const nextPeriod = () => {
+    let nextDate: Date;
+
     if (viewMode === 'month') {
-      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+      nextDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
     } else if (viewMode === 'week') {
-      const nextWeek = new Date(currentDate);
-      nextWeek.setDate(currentDate.getDate() + 7);
-      setCurrentDate(nextWeek);
+      nextDate = new Date(currentDate);
+      nextDate.setDate(currentDate.getDate() + 7);
     } else {
-      const nextDay = new Date(currentDate);
-      nextDay.setDate(currentDate.getDate() + 1);
-      setCurrentDate(nextDay);
+      nextDate = new Date(currentDate);
+      nextDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Check if the new date is within range
+    if (isDateInRange(nextDate)) {
+      setCurrentDate(nextDate);
     }
   };
 
   const prevPeriod = () => {
+    let prevDate: Date;
+
     if (viewMode === 'month') {
-      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+      prevDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
     } else if (viewMode === 'week') {
-      const prevWeek = new Date(currentDate);
-      prevWeek.setDate(currentDate.getDate() - 7);
-      setCurrentDate(prevWeek);
+      prevDate = new Date(currentDate);
+      prevDate.setDate(currentDate.getDate() - 7);
     } else {
-      const prevDay = new Date(currentDate);
-      prevDay.setDate(currentDate.getDate() - 1);
-      setCurrentDate(prevDay);
+      prevDate = new Date(currentDate);
+      prevDate.setDate(currentDate.getDate() - 1);
+    }
+
+    // Check if the new date is within range
+    if (isDateInRange(prevDate)) {
+      setCurrentDate(prevDate);
+    }
+  };
+
+  const canNavigateNext = () => {
+    let nextDate: Date;
+
+    if (viewMode === 'month') {
+      nextDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+    } else if (viewMode === 'week') {
+      nextDate = new Date(currentDate);
+      nextDate.setDate(currentDate.getDate() + 7);
+    } else {
+      nextDate = new Date(currentDate);
+      nextDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return isDateInRange(nextDate);
+  };
+
+  const canNavigatePrev = () => {
+    let prevDate: Date;
+
+    if (viewMode === 'month') {
+      prevDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    } else if (viewMode === 'week') {
+      prevDate = new Date(currentDate);
+      prevDate.setDate(currentDate.getDate() - 7);
+    } else {
+      prevDate = new Date(currentDate);
+      prevDate.setDate(currentDate.getDate() - 1);
+    }
+
+    return isDateInRange(prevDate);
+  };
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+    setSelectedDate(null);
+  };
+
+  const handleYearChange = (year: number) => {
+    const newDate = new Date(year, currentDate.getMonth(), 1);
+    if (isDateInRange(newDate)) {
+      setCurrentDate(newDate);
+    }
+  };
+
+  const handleMonthChange = (month: number) => {
+    const newDate = new Date(currentDate.getFullYear(), month, 1);
+    if (isDateInRange(newDate)) {
+      setCurrentDate(newDate);
     }
   };
 
@@ -326,24 +425,85 @@ const CalendarModal: React.FC<CalendarModalProps> = ({ isOpen, onClose }) => {
           </div>
           
           <div className="p-6">
-            {/* Calendar Header */}
+            {/* Enhanced Calendar Header with Dropdowns */}
             <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                {/* Previous Period Button */}
+                <button
+                  onClick={prevPeriod}
+                  disabled={!canNavigatePrev()}
+                  className={`p-2 rounded-lg transition-colors ${
+                    canNavigatePrev() 
+                      ? 'hover:bg-gray-100 text-gray-700' 
+                      : 'text-gray-300 cursor-not-allowed'
+                  }`}
+                >
+                  <Icons.ChevronLeft className="w-5 h-5" />
+                </button>
+
+                {/* Month and Year Dropdowns for Month View */}
+                {viewMode === 'month' && (
+                  <div className="flex items-center space-x-2">
+                    {/* Month Dropdown */}
+                    <select
+                      value={currentDate.getMonth()}
+                      onChange={(e) => handleMonthChange(parseInt(e.target.value))}
+                      className="px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {getMonthOptions().map(month => (
+                        <option key={month.value} value={month.value}>
+                          {month.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Year Dropdown */}
+                    <select
+                      value={currentDate.getFullYear()}
+                      onChange={(e) => handleYearChange(parseInt(e.target.value))}
+                      className="px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {getYearOptions().map(year => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Period Title for Week/Day Views */}
+                {viewMode !== 'month' && (
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    {formatPeriodTitle()}
+                  </h2>
+                )}
+
+                {/* Next Period Button */}
+                <button
+                  onClick={nextPeriod}
+                  disabled={!canNavigateNext()}
+                  className={`p-2 rounded-lg transition-colors ${
+                    canNavigateNext() 
+                      ? 'hover:bg-gray-100 text-gray-700' 
+                      : 'text-gray-300 cursor-not-allowed'
+                  }`}
+                >
+                  <Icons.ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Today Button */}
               <button
-                onClick={prevPeriod}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={goToToday}
+                className="flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
               >
-                <Icons.ChevronLeft className="w-5 h-5" />
-              </button>
-              <h2 className="text-xl font-semibold text-gray-900">
-                {formatPeriodTitle()}
-              </h2>
-              <button
-                onClick={nextPeriod}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <Icons.ChevronRight className="w-5 h-5" />
+                <Icons.Calendar className="w-4 h-4 mr-2" />
+                Today
               </button>
             </div>
+
+
 
             {/* Calendar Content */}
             <div className="mb-6">

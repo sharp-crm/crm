@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react';
 import PageHeader from '../components/Common/PageHeader';
 import DataTable from '../components/Common/DataTable';
@@ -8,15 +8,36 @@ import KanbanView from '../components/Views/KanbanView';
 import GridView from '../components/Views/GridView';
 import TimelineView from '../components/Views/TimelineView';
 import ChartView from '../components/Views/ChartView';
-import { useCRMStore } from '../store/crmStore';
+import { dealsApi, Deal } from '../api/services';
 import { ViewType } from '../types';
 import AddNewModal from '../components/Common/AddNewModal';
 
 const Deals: React.FC = () => {
-  const { deals, updateDeal } = useCRMStore();
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('list');
-    const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [defaultType, setDefaultType] = useState<string | null>(null);
+
+  // Fetch deals data on component mount
+  useEffect(() => {
+    const fetchDeals = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await dealsApi.getAll();
+        setDeals(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch deals');
+        console.error('Error fetching deals:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDeals();
+  }, []);
 
 
   const columns = [
@@ -81,6 +102,15 @@ const Deals: React.FC = () => {
     }
   ];
 
+  const handleDelete = async (id: string) => {
+    try {
+      await dealsApi.delete(id);
+      setDeals(prev => prev.filter(deal => deal.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete deal');
+    }
+  };
+
   const actions = (row: any) => (
     <div className="flex items-center space-x-2">
       <button className="p-1 text-gray-400 hover:text-gray-600">
@@ -89,14 +119,24 @@ const Deals: React.FC = () => {
       <button className="p-1 text-gray-400 hover:text-gray-600">
         <Icons.Edit2 className="w-4 h-4" />
       </button>
-      <button className="p-1 text-gray-400 hover:text-red-600">
+      <button 
+        className="p-1 text-gray-400 hover:text-red-600"
+        onClick={() => handleDelete(row.id)}
+      >
         <Icons.Trash2 className="w-4 h-4" />
       </button>
     </div>
   );
 
-  const handleDealMove = (dealId: string, newStage: string) => {
-    updateDeal(dealId, { stage: newStage as any });
+  const handleDealMove = async (dealId: string, newStage: string) => {
+    try {
+      const updatedDeal = await dealsApi.update(dealId, { stage: newStage });
+      setDeals(prev => prev.map(deal => 
+        deal.id === dealId ? updatedDeal : deal
+      ));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update deal');
+    }
   };
 
   const headerActions = (
@@ -127,8 +167,18 @@ const Deals: React.FC = () => {
   );
 
   const totalValue = deals.reduce((sum, deal) => sum + deal.value, 0);
-  const avgProbability = deals.reduce((sum, deal) => sum + deal.probability, 0) / deals.length;
+  const avgProbability = deals.length > 0 ? deals.reduce((sum, deal) => sum + deal.probability, 0) / deals.length : 0;
   const expectedValue = deals.reduce((sum, deal) => sum + (deal.value * deal.probability / 100), 0);
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     switch (currentView) {
@@ -163,6 +213,16 @@ const Deals: React.FC = () => {
         ]}
         actions={headerActions}
       />
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex">
+            <Icons.AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+            <p className="text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -238,14 +298,36 @@ const Deals: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        {renderContent()}
-      </div>
+      {deals.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <Icons.Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No deals found</h3>
+          <p className="text-gray-500 mb-6">Get started by creating your first deal.</p>
+          <button
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
+            onClick={() => {
+              setDefaultType('deal');
+              setIsModalOpen(true);
+            }}
+          >
+            <Icons.Plus className="w-4 h-4 mr-2" />
+            New Deal
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          {renderContent()}
+        </div>
+      )}
 
       <AddNewModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         defaultType={defaultType}
+        onSuccess={() => {
+          // Refresh deals data after successful creation
+          dealsApi.getAll().then(setDeals).catch(console.error);
+        }}
       />
     </div>
   );

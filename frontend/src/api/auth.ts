@@ -71,8 +71,12 @@ API.interceptors.response.use(
       authStore.login({
         userId: authStore.user?.userId || '',
         email: authStore.user?.email || '',
-        username: authStore.user?.username || '',
+        firstName: authStore.user?.firstName || '',
+        lastName: authStore.user?.lastName || '',
         role: authStore.user?.role || '',
+        tenantId: authStore.user?.tenantId,
+        createdBy: authStore.user?.createdBy,
+        phoneNumber: authStore.user?.phoneNumber,
         accessToken,
         refreshToken: newRefreshToken,
       });

@@ -4,9 +4,8 @@ import { create } from 'zustand';
 interface User {
   userId: string;
   email: string;
-  username: string;
-  firstName?: string;
-  lastName?: string;
+  firstName: string;
+  lastName: string;
   role: string;
   tenantId?: string;
   createdBy?: string;
@@ -20,9 +19,8 @@ interface AuthState {
   login: (payload: {
     userId: string;
     email: string;
-    username: string;
-    firstName?: string;
-    lastName?: string;
+    firstName: string;
+    lastName: string;
     role: string;
     tenantId?: string;
     createdBy?: string;
@@ -41,8 +39,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   refreshToken: null,
 
   login: (payload) => {
-    const { userId, email, username, firstName, lastName, role, tenantId, createdBy, phoneNumber, accessToken, refreshToken } = payload;
-    const user = { userId, email, username, firstName, lastName, role, tenantId, createdBy, phoneNumber };
+    const { userId, email, firstName, lastName, role, tenantId, createdBy, phoneNumber, accessToken, refreshToken } = payload;
+    const user = { userId, email, firstName, lastName, role, tenantId, createdBy, phoneNumber };
     set({ user, accessToken, refreshToken });
 
     // Store in both session and local storage

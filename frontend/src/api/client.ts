@@ -77,8 +77,12 @@ API.interceptors.response.use(
       authStore.login({
         userId: user.userId,
         email: user.email,
-        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
         role: user.role,
+        tenantId: user.tenantId,
+        createdBy: user.createdBy,
+        phoneNumber: user.phoneNumber,
         accessToken,
         refreshToken: newRefreshToken,
       });

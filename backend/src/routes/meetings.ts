@@ -9,7 +9,7 @@ const router = express.Router();
 // Get all meetings for current user
 router.get("/", async (req, res, next) => {
   try {
-    const currentUser = (req as any).user?.username;
+    const currentUser = (req as any).user?.email;
     const { startDate, endDate, status } = req.query;
     
     let filterExpression = "contains(attendees, :currentUser)";
@@ -55,7 +55,7 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const currentUser = (req as any).user?.username;
+    const currentUser = (req as any).user?.email;
     
     const result = await docClient.send(
       new GetCommand({
@@ -104,7 +104,7 @@ router.post("/", async (req, res, next) => {
     }
 
     const id = uuidv4();
-    const createdBy = (req as any).user?.username;
+    const createdBy = (req as any).user?.email;
     const createdAt = new Date().toISOString();
 
     // Ensure creator is in attendees list
@@ -143,7 +143,7 @@ router.put("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    const currentUser = (req as any).user?.username;
+    const currentUser = (req as any).user?.email;
 
     // First check if meeting exists and user has access
     const getResult = await docClient.send(
@@ -214,7 +214,7 @@ router.put("/:id", async (req, res, next) => {
 router.delete("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const currentUser = (req as any).user?.username;
+    const currentUser = (req as any).user?.email;
 
     // First check if meeting exists and user has access
     const getResult = await docClient.send(
@@ -250,7 +250,7 @@ router.delete("/:id", async (req, res, next) => {
 router.patch("/:id/cancel", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const currentUser = (req as any).user?.username;
+    const currentUser = (req as any).user?.email;
     const { reason } = req.body;
 
     // First check if meeting exists and user has access
@@ -297,7 +297,7 @@ router.patch("/:id/cancel", async (req, res, next) => {
 // Get calendar events (simplified format for frontend calendar components)
 router.get("/calendar/events", async (req, res, next) => {
   try {
-    const currentUser = (req as any).user?.username;
+    const currentUser = (req as any).user?.email;
     const { month, year } = req.query;
     
     let filterExpression = "contains(attendees, :currentUser)";
@@ -344,7 +344,7 @@ router.get("/calendar/events", async (req, res, next) => {
 // Get upcoming meetings (next 7 days)
 router.get("/upcoming", async (req, res, next) => {
   try {
-    const currentUser = (req as any).user?.username;
+    const currentUser = (req as any).user?.email;
     const now = new Date();
     const weekFromNow = new Date();
     weekFromNow.setDate(weekFromNow.getDate() + 7);

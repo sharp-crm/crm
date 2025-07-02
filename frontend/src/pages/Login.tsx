@@ -22,10 +22,10 @@ const Login: React.FC = () => {
 
       if (response.status === 200) {
         const { accessToken, refreshToken, user } = response.data;
-        const { userId, username, firstName, lastName, role, email: userEmail, tenantId, createdBy, phoneNumber } = user;
+        const { userId, firstName, lastName, role, email: userEmail, tenantId, createdBy, phoneNumber } = user;
 
         // ✅ Store in Zustand (also updates sessionStorage)
-        login({ userId, username, firstName, lastName, email: userEmail, role, tenantId, createdBy, phoneNumber, accessToken, refreshToken });
+        login({ userId, firstName, lastName, email: userEmail, role, tenantId, createdBy, phoneNumber, accessToken, refreshToken });
 
         // ✅ Set axios default for future requests
         axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;

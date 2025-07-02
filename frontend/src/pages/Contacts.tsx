@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react';
 import PageHeader from '../components/Common/PageHeader';
 import DataTable from '../components/Common/DataTable';
 import StatusBadge from '../components/Common/StatusBadge';
-import { mockContacts } from '../data/mockData';
+import { contactsApi, Contact } from '../api/services';
 import AddNewModal from '../components/Common/AddNewModal';
 
 const Contacts: React.FC = () => {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [defaultType, setDefaultType] = useState<string | null>(null);
 
@@ -16,8 +19,36 @@ const Contacts: React.FC = () => {
     createdDate: false
   });
 
+  // Fetch contacts data on component mount
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await contactsApi.getAll();
+        setContacts(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch contacts');
+        console.error('Error fetching contacts:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContacts();
+  }, []);
+
   const handleCheckboxChange = (key: keyof typeof filters) => {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await contactsApi.delete(id);
+      setContacts(prev => prev.filter(contact => contact.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete contact');
+    }
   };
 
   const columns = [
@@ -76,7 +107,10 @@ const Contacts: React.FC = () => {
       <button className="p-1 text-gray-400 hover:text-gray-600">
         <Icons.Edit2 className="w-4 h-4" />
       </button>
-      <button className="p-1 text-gray-400 hover:text-red-600">
+      <button 
+        className="p-1 text-gray-400 hover:text-red-600"
+        onClick={() => handleDelete(row.id)}
+      >
         <Icons.Trash2 className="w-4 h-4" />
       </button>
     </div>
@@ -100,6 +134,27 @@ const Contacts: React.FC = () => {
       </button>
     </>
   );
+
+  const getStatusCounts = () => {
+    const counts = {
+      total: contacts.length,
+      active: contacts.filter(contact => contact.status === 'Active').length,
+      inactive: contacts.filter(contact => contact.status === 'Inactive').length
+    };
+    return counts;
+  };
+
+  const statusCounts = getStatusCounts();
+
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 overflow-x-auto">
@@ -193,6 +248,16 @@ const Contacts: React.FC = () => {
             actions={headerActions}
           />
 
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex">
+                <Icons.AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+                <p className="text-red-700">{error}</p>
+              </div>
+            </div>
+          )}
+
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -202,7 +267,7 @@ const Contacts: React.FC = () => {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Total Contacts</p>
-                  <p className="text-2xl font-bold text-gray-900">{mockContacts.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{statusCounts.total}</p>
                 </div>
               </div>
             </div>
@@ -214,9 +279,7 @@ const Contacts: React.FC = () => {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Active</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {mockContacts.filter(contact => contact.status === 'Active').length}
-                  </p>
+                  <p className="text-2xl font-bold text-gray-900">{statusCounts.active}</p>
                 </div>
               </div>
             </div>
@@ -229,28 +292,52 @@ const Contacts: React.FC = () => {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Companies</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {new Set(mockContacts.map(c => c.company)).size}
+                    {new Set(contacts.map(c => c.company)).size}
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Contacts Table */}
-          <DataTable
-            columns={columns}
-            data={mockContacts}
-            actions={actions}
-            onRowClick={(contact) => console.log('View contact:', contact)}
-          />
-
-          <AddNewModal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            defaultType={defaultType}
-          />
+          {/* Data Table */}
+          {contacts.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <Icons.Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No contacts found</h3>
+              <p className="text-gray-500 mb-6">Get started by creating your first contact.</p>
+              <button
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
+                onClick={() => {
+                  setDefaultType('contact');
+                  setIsModalOpen(true);
+                }}
+              >
+                <Icons.Plus className="w-4 h-4 mr-2" />
+                New Contact
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <DataTable
+                data={contacts}
+                columns={columns}
+                actions={actions}
+              />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Add New Modal */}
+      <AddNewModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        defaultType={defaultType}
+        onSuccess={() => {
+          // Refresh contacts data after successful creation
+          contactsApi.getAll().then(setContacts).catch(console.error);
+        }}
+      />
     </div>
   );
 };

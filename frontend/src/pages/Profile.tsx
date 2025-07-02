@@ -52,11 +52,11 @@ const Profile: React.FC = () => {
             <div className="flex items-center space-x-6">
               <img
                 src={avatar}
-                alt={user.username}
+                alt={`${user.firstName} ${user.lastName}`}
                 className="w-24 h-24 rounded-full object-cover border-2 border-blue-200 transition-transform hover:scale-105"
               />
               <div className="space-y-1">
-                <h2 className="text-3xl font-bold text-gray-900">{user.username}</h2>
+                <h2 className="text-3xl font-bold text-gray-900">{`${user.firstName} ${user.lastName}`}</h2>
                 <p className="text-gray-600 font-medium">{user.role}</p>
                 <p className="text-gray-500 text-sm">{user.email}</p>
                 <p className="text-gray-500 text-sm">User ID: {user.userId}</p>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import * as Icons from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useNotificationStore } from '../../store/useNotificationStore';
 import avatar from '../../Assets/avatar.png';
 
 import AddNewModal from '../Common/AddNewModal';
@@ -12,11 +13,6 @@ interface HeaderProps {
   onToggleSidebar: () => void;
 }
 
-const mockNotifications = [
-  { id: 1, message: 'New lead assigned', read: false, timestamp: '2025-06-19 10:00' },
-  { id: 2, message: 'Deal updated', read: true, timestamp: '2025-06-19 09:30' },
-];
-
 const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAddNew, setShowAddNew] = useState(false);
@@ -24,7 +20,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const notificationRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((s) => s.user);
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  const { notifications, unreadCount } = useNotificationStore();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -93,7 +89,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               </button>
               {showNotifications && (
                 <NotificationPanel
-                  notifications={mockNotifications}
+                  notifications={notifications}
                   onClose={() => setShowNotifications(false)}
                 />
               )}
@@ -106,11 +102,11 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               >
                 <img
                   src={avatar}
-                  alt={user?.username || 'User'}
+                  alt={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}
                   className="w-8 h-8 rounded-full object-cover"
                 />
                 <div className="text-left">
-                  <div className="text-sm font-medium text-gray-900">{user?.username}</div>
+                  <div className="text-sm font-medium text-gray-900">{`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}</div>
                   <div className="text-xs text-gray-500">{user?.role}</div>
                 </div>
               </Link>

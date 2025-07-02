@@ -61,8 +61,8 @@ export const settingsItems: SidebarItem[] = [
     path: '/settings',
     icon: 'Settings',
     children: [
-      { name: 'Personal Settings', path: '/settings/general/personal', icon: 'User' },
-      { name: 'Access Control', path: '/settings/security/access-control', icon: 'Users' },
+      { name: 'Personal Settings', path: '/settings/personal', icon: 'User' },
+      { name: 'Access Control', path: '/settings/access-control', icon: 'Users' },
     ]
   }
 ];

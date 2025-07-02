@@ -65,8 +65,8 @@ function App() {
           <Route path="subsidiaries" element={<Subsidiaries />} />
           <Route path="dealers" element={<Dealers />} />
           <Route path="notifications" element={<Notifications />} />
-          <Route path="settings/general/personal" element={<Personal />} />
-          <Route path="settings/security/access-control" element={<AccessControl />} />
+          <Route path="settings/personal" element={<Personal />} />
+          <Route path="settings/access-control" element={<AccessControl />} />
           <Route path="integrations/email" element={<EmailIntegration />} />
           <Route path="team-chat" element={<TeamChat />} />
           <Route path="profile" element={<Profile />} />

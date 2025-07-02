@@ -211,15 +211,6 @@ export const mockProducts: Product[] = [
   }
 ];
 
-export const mockNotifications = [
-  { message: 'Closed a deal with TechNova.', time: '2 minutes ago', type: 'success', read: false },
-  { message: 'You have a meeting in 30 minutes.', time: '1 hour ago', type: 'info', read: true },
-  { message: 'Lead “Global Enterprises” has been converted.', time: '2 hours ago', type: 'success', read: false },
-  { message: 'Task “Follow-up with client” is due today.', time: '5 hours ago', type: 'info', read: true },
-  { message: 'New message from Sales Manager.', time: '1 day ago', type: 'info', read: false },
-];
-
-
 export const salesMetrics = {
   totalRevenue: 1250000,
   monthlyGrowth: 12.5,

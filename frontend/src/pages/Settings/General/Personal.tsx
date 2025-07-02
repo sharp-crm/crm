@@ -3,7 +3,10 @@ import * as Icons from 'lucide-react';
 import PageHeader from '../../../components/Common/PageHeader';
 import { useAuthStore } from '../../../store/useAuthStore';
 import API from '../../../api/client';
-import avatar from '../../../Assets/avatar.png'
+import avatar from '../../../Assets/avatar.png';
+import PhoneNumberInput from '../../../components/Common/PhoneNumberInput';
+import PasswordStrengthMeter from '../../../components/Common/PasswordStrengthMeter';
+import { validatePassword } from '../../../utils/passwordValidation';
 
 const Personal: React.FC = () => {
   const user = useAuthStore((s) => s.user);
@@ -22,8 +25,8 @@ const Personal: React.FC = () => {
   React.useEffect(() => {
     if (user) {
       setFormData({
-        firstName: user?.firstName || user?.username?.split(' ')[0] || '',
-        lastName: user?.lastName || user?.username?.split(' ')[1] || '',
+        firstName: user?.firstName || '',
+        lastName: user?.lastName || '',
         email: user?.email || '',
         phoneNumber: user?.phoneNumber || '',
         password: '',
@@ -34,10 +37,16 @@ const Personal: React.FC = () => {
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [passwordTouched, setPasswordTouched] = useState(false);
 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    
+    if (name === 'password') {
+      setPasswordTouched(true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,6 +57,15 @@ const Personal: React.FC = () => {
     if (formData.password && formData.password !== formData.confirmPassword) {
       setError('Password and Confirm Password do not match');
       return;
+    }
+
+    // Validate password strength if password is being changed
+    if (formData.password) {
+      const passwordValidation = validatePassword(formData.password);
+      if (!passwordValidation.isValid) {
+        setError('Password does not meet security requirements');
+        return;
+      }
     }
 
     try {
@@ -64,16 +82,15 @@ const Personal: React.FC = () => {
 
       const { setUser } = useAuthStore.getState();
       setUser({
-        ...user,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        username: `${formData.firstName} ${formData.lastName}`,
         phoneNumber: formData.phoneNumber,
       });
 
     } catch (err: any) {
       console.error(err);
-      setError('Failed to update profile. Please try again.');
+      const errorMessage = err.response?.data?.error || 'Failed to update profile. Please try again.';
+      setError(errorMessage);
     }
   };
 
@@ -84,8 +101,7 @@ const Personal: React.FC = () => {
         subtitle="Manage your personal information and preferences"
         breadcrumbs={[
           { name: 'Home', path: '/' },
-          { name: 'Settings', path: '/settings' },
-          { name: 'General', path: '/settings/general' },
+          { name: 'Settings'},
           { name: 'Personal' }
         ]}
       />
@@ -152,16 +168,15 @@ const Personal: React.FC = () => {
                   readOnly
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
                 />
+                <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                <input
-                  type="tel"
-                  name="phoneNumber"
+                <PhoneNumberInput
                   value={formData.phoneNumber}
-                  placeholder="+1 (123) 456-7890"
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(phoneNumber) => setFormData(prev => ({ ...prev, phoneNumber }))}
+                  placeholder="Enter phone number"
+                  className="w-full"
                 />
               </div>
             </div>
@@ -175,8 +190,17 @@ const Personal: React.FC = () => {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
+                  placeholder="Leave blank to keep current password"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+                {formData.password && passwordTouched && (
+                  <div className="mt-2">
+                    <PasswordStrengthMeter
+                      password={formData.password}
+                      showRequirements={true}
+                    />
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
@@ -185,8 +209,12 @@ const Personal: React.FC = () => {
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
+                  placeholder="Confirm new password"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+                {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                  <p className="text-red-600 text-xs mt-1">Passwords do not match</p>
+                )}
               </div>
             </div>
 
@@ -196,7 +224,11 @@ const Personal: React.FC = () => {
               {success && <p className="text-green-600 text-sm">{success}</p>}
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={
+                  (formData.password.length > 0 && !validatePassword(formData.password).isValid) ||
+                  (formData.password.length > 0 && formData.password !== formData.confirmPassword)
+                }
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 Save Changes
               </button>
@@ -210,73 +242,3 @@ const Personal: React.FC = () => {
 
 export default Personal;
 
-
-
-{/* Preferences */ }
-{/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Timezone
-                </label>
-                <select
-                  name="timezone"
-                  value={formData.timezone}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="America/New_York">Eastern Time (ET)</option>
-                  <option value="America/Chicago">Central Time (CT)</option>
-                  <option value="America/Denver">Mountain Time (MT)</option>
-                  <option value="America/Los_Angeles">Pacific Time (PT)</option>
-                  <option value="UTC">UTC</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Language
-                </label>
-                <select
-                  name="language"
-                  value={formData.language}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="English">English</option>
-                  <option value="Spanish">Spanish</option>
-                  <option value="French">French</option>
-                  <option value="German">German</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date Format
-                </label>
-                <select
-                  name="dateFormat"
-                  value={formData.dateFormat}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Time Format
-                </label>
-                <select
-                  name="timeFormat"
-                  value={formData.timeFormat}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="12-hour">12-hour (AM/PM)</option>
-                  <option value="24-hour">24-hour</option>
-                </select>
-              </div>
-            </div> */}

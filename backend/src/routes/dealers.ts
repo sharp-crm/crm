@@ -1,7 +1,8 @@
 import express, { Request, Response, NextFunction } from "express";
-import { PutCommand, GetCommand, ScanCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "../services/dynamoClient";
 import { v4 as uuidv4 } from "uuid";
+import { authenticate } from "../middlewares/authenticate";
 
 interface Dealer {
   id: string;
@@ -12,7 +13,9 @@ interface Dealer {
   location: string;
   territory: string;
   status: string;
+  tenantId: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface DealerResponse {
@@ -33,17 +36,32 @@ interface ErrorResponse {
 
 const router = express.Router();
 
-// Get all dealers
-router.get("/", (async (_req: Request, res: Response, next: NextFunction) => {
+// Apply authentication middleware to all routes
+router.use(authenticate);
+
+// Get all dealers for the current tenant
+router.get("/", (async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const tenantId = (req as any).user?.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: "Tenant ID is required" });
+    }
+
     const result = await docClient.send(
-      new ScanCommand({
-        TableName: "Dealers"
+      new QueryCommand({
+        TableName: "Dealers",
+        IndexName: "TenantIdIndex",
+        KeyConditionExpression: "tenantId = :tenantId",
+        ExpressionAttributeValues: {
+          ":tenantId": tenantId
+        }
       })
     );
 
     res.json({ data: (result.Items as Dealer[]) || [] });
   } catch (error) {
+    console.error('Get dealers error:', error);
     next(error);
   }
 }) as express.RequestHandler);
@@ -52,6 +70,7 @@ router.get("/", (async (_req: Request, res: Response, next: NextFunction) => {
 router.get("/:id", (async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const tenantId = (req as any).user?.tenantId;
     
     const result = await docClient.send(
       new GetCommand({
@@ -64,8 +83,14 @@ router.get("/:id", (async (req: Request<{ id: string }>, res: Response, next: Ne
       return res.status(404).json({ error: "Dealer not found" });
     }
 
+    // Verify tenant ownership
+    if (result.Item.tenantId !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     res.json({ data: result.Item as Dealer });
   } catch (error) {
+    console.error('Get dealer error:', error);
     next(error);
   }
 }) as express.RequestHandler);
@@ -82,6 +107,8 @@ router.post("/", (async (req: Request, res: Response, next: NextFunction) => {
       territory,
       status = "Active"
     } = req.body;
+    
+    const tenantId = (req as any).user?.tenantId;
     const id = uuidv4();
     const createdAt = new Date().toISOString();
 
@@ -94,7 +121,9 @@ router.post("/", (async (req: Request, res: Response, next: NextFunction) => {
       location,
       territory,
       status,
-      createdAt
+      tenantId,
+      createdAt,
+      updatedAt: createdAt
     };
 
     await docClient.send(
@@ -106,6 +135,7 @@ router.post("/", (async (req: Request, res: Response, next: NextFunction) => {
 
     res.status(201).json({ data: dealer });
   } catch (error) {
+    console.error('Create dealer error:', error);
     next(error);
   }
 }) as express.RequestHandler);
@@ -115,6 +145,23 @@ router.put("/:id", (async (req: Request<{ id: string }>, res: Response, next: Ne
   try {
     const { id } = req.params;
     const updates = req.body;
+    const tenantId = (req as any).user?.tenantId;
+    
+    // First verify the dealer exists and belongs to the tenant
+    const getResult = await docClient.send(
+      new GetCommand({
+        TableName: "Dealers",
+        Key: { id }
+      })
+    );
+
+    if (!getResult.Item) {
+      return res.status(404).json({ error: "Dealer not found" });
+    }
+
+    if (getResult.Item.tenantId !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     
     // Build update expression
     const updateExpressions = [];
@@ -122,14 +169,19 @@ router.put("/:id", (async (req: Request<{ id: string }>, res: Response, next: Ne
     const expressionAttributeValues: Record<string, any> = {};
     
     for (const [key, value] of Object.entries(updates)) {
-      if (key !== 'id') {
+      if (key !== 'id' && key !== 'tenantId' && key !== 'createdAt') {
         updateExpressions.push(`#${key} = :${key}`);
         expressionAttributeNames[`#${key}`] = key;
         expressionAttributeValues[`:${key}`] = value;
       }
     }
 
-    if (updateExpressions.length === 0) {
+    // Add updatedAt
+    updateExpressions.push('#updatedAt = :updatedAt');
+    expressionAttributeNames['#updatedAt'] = 'updatedAt';
+    expressionAttributeValues[':updatedAt'] = new Date().toISOString();
+
+    if (updateExpressions.length === 1) {
       return res.status(400).json({ error: "No valid fields to update" });
     }
 
@@ -146,6 +198,7 @@ router.put("/:id", (async (req: Request<{ id: string }>, res: Response, next: Ne
 
     res.json({ data: result.Attributes as Dealer });
   } catch (error) {
+    console.error('Update dealer error:', error);
     next(error);
   }
 }) as express.RequestHandler);
@@ -154,6 +207,23 @@ router.put("/:id", (async (req: Request<{ id: string }>, res: Response, next: Ne
 router.delete("/:id", (async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const tenantId = (req as any).user?.tenantId;
+
+    // First verify the dealer exists and belongs to the tenant
+    const getResult = await docClient.send(
+      new GetCommand({
+        TableName: "Dealers",
+        Key: { id }
+      })
+    );
+
+    if (!getResult.Item) {
+      return res.status(404).json({ error: "Dealer not found" });
+    }
+
+    if (getResult.Item.tenantId !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
 
     await docClient.send(
       new DeleteCommand({
@@ -164,6 +234,7 @@ router.delete("/:id", (async (req: Request<{ id: string }>, res: Response, next:
 
     res.json({ message: "Dealer deleted successfully" });
   } catch (error) {
+    console.error('Delete dealer error:', error);
     next(error);
   }
 }) as express.RequestHandler);
