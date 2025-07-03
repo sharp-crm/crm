@@ -249,34 +249,5 @@ npm run test
 - Add tests for new features
 - Update documentation when needed
 
-## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
 
-## 🆘 Support
-
-For support, email support@sharpcrm.com or create an issue on GitHub.
-
-## 🗂️ Project Roadmap
-
-### Phase 1 (Current)
-- ✅ Core CRM functionality
-- ✅ User management and authentication
-- ✅ Basic analytics and reporting
-- ✅ Responsive UI design
-
-### Phase 2 (Planned)
-- 📧 Advanced email integration
-- 📱 Mobile app development
-- 🔗 Third-party integrations (Salesforce, HubSpot)
-- 🤖 AI-powered insights and recommendations
-
-### Phase 3 (Future)
-- 📞 VoIP integration
-- 📊 Advanced business intelligence
-- 🌐 Multi-language support
-- 🔄 Workflow automation
-
----
-
-Built with ❤️ by the Sharp CRM Team 
