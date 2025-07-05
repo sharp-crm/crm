@@ -1,0 +1,181 @@
+# SharpCRM User Guide
+
+## Table of Contents
+1. Getting Started
+2. Basic Navigation
+3. Managing Contacts
+4. Working with Leads
+5. Deal Management
+6. Task Management
+7. Reports & Analytics
+8. Team Collaboration
+9. Settings & Preferences
+10. Troubleshooting
+
+## 1. Getting Started
+
+### 1.1 Logging In
+1. Navigate to your SharpCRM URL
+2. Enter your email and password
+3. Click "Login" or press Enter
+
+### 1.2 Dashboard Overview
+- Quick statistics
+- Recent activities
+- Upcoming tasks
+- Important notifications
+
+## 2. Basic Navigation
+
+### 2.1 Main Menu
+- Contacts
+- Leads
+- Deals
+- Tasks
+- Reports
+- Settings
+
+### 2.2 View Options
+- Grid View: For detailed list view
+- Kanban Board: For visual process management
+- Timeline: For temporal data
+- Calendar: For scheduled items
+
+## 3. Managing Contacts
+
+### 3.1 Adding a New Contact
+1. Click "New Contact"
+2. Fill in required information:
+   - Name
+   - Email
+   - Phone
+   - Company
+3. Add additional details as needed
+4. Click "Save"
+
+### 3.2 Contact Management
+- Viewing contact details
+- Editing contact information
+- Adding notes
+- Tracking communication
+- Setting reminders
+
+## 4. Working with Leads
+
+### 4.1 Lead Creation
+- Manual entry
+- Import from file
+- Web form capture
+
+### 4.2 Lead Management
+- Scoring
+- Status updates
+- Follow-up tasks
+- Conversion tracking
+
+## 5. Deal Management
+
+### 5.1 Creating Deals
+1. Click "New Deal"
+2. Enter deal details:
+   - Name
+   - Value
+   - Stage
+   - Related contacts
+3. Set follow-up actions
+
+### 5.2 Pipeline Management
+- Moving deals between stages
+- Updating deal values
+- Adding notes
+- Setting reminders
+
+## 6. Task Management
+
+### 6.1 Creating Tasks
+- Task types
+- Priority levels
+- Due dates
+- Assignments
+
+### 6.2 Task Views
+- List view
+- Calendar view
+- Team view
+- Status tracking
+
+## 7. Reports & Analytics
+
+### 7.1 Standard Reports
+- Sales pipeline
+- Lead conversion
+- Activity reports
+- Team performance
+
+### 7.2 Custom Reports
+- Report builder
+- Data filtering
+- Export options
+- Scheduling reports
+
+## 8. Team Collaboration
+
+### 8.1 Chat Features
+- Direct messaging
+- Group chats
+- File sharing
+- Emoji support
+
+### 8.2 Notifications
+- System notifications
+- Custom alerts
+- Email notifications
+- Mobile notifications
+
+## 9. Settings & Preferences
+
+### 9.1 Personal Settings
+- Profile information
+- Password change
+- Notification preferences
+- Theme settings
+
+### 9.2 Team Settings
+- User management
+- Role assignments
+- Access control
+- Team structure
+
+## 10. Troubleshooting
+
+### 10.1 Common Issues
+- Login problems
+- Data sync issues
+- Report generation
+- Search functionality
+
+### 10.2 Getting Help
+- In-app help
+- Support contact
+- Knowledge base
+- Video tutorials
+
+## Appendix
+
+### A. Keyboard Shortcuts
+- Navigation shortcuts
+- Action shortcuts
+- View shortcuts
+- Search shortcuts
+
+### B. Glossary
+- CRM terms
+- Status definitions
+- System terminology
+- Common acronyms
+
+### C. Best Practices
+- Data entry
+- Lead management
+- Deal tracking
+- Report generation 

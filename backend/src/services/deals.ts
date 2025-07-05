@@ -15,6 +15,7 @@ export interface Deal {
   
   // Optional fields from AddNewModal  
   description?: string;
+  account?: string;
   
   // Additional fields for deal functionality
   value?: number; // same as amount for backward compatibility

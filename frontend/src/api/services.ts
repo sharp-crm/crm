@@ -961,6 +961,76 @@ export interface User {
   tenantId: string;
 }
 
+// Chat interfaces
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  timestamp: string;
+  type: 'text' | 'file' | 'system';
+  channelId?: string;
+  recipientId?: string;
+  reactions: Array<{
+    emoji: string;
+    users: string[];
+  }>;
+  isEdited: boolean;
+  readBy: Array<{
+    userId: string;
+    readAt: string;
+  }>;
+  replyTo?: string;
+  files?: Array<{
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+    preview?: string;
+  }>;
+  deliveryStatus?: {
+    sent: boolean;
+    delivered: boolean;
+    read: boolean;
+    timestamp: string;
+  };
+  tenantId: string;
+  createdBy: string;
+  createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  isDeleted: boolean;
+}
+
+export interface ChatChannel {
+  id: string;
+  name: string;
+  type: 'public' | 'private' | 'direct';
+  description?: string;
+  members: string[];
+  createdBy: string;
+  permissions: {
+    canPost: string[];
+    canInvite: string[];
+    canManage: string[];
+  };
+  tenantId: string;
+  createdAt: string;
+  updatedAt?: string;
+  isDeleted: boolean;
+}
+
+export interface ChatUser {
+  id: string;
+  name: string;
+  email: string;
+  status: 'online' | 'away' | 'offline';
+  role: string;
+  avatar?: string;
+  lastSeen?: string;
+  tenantId: string;
+}
+
 export const usersApi = {
   getAll: async (): Promise<User[]> => {
     const response = await API.get('/users');
@@ -984,5 +1054,189 @@ export const usersApi = {
 
   delete: async (id: string): Promise<void> => {
     await API.delete(`/users/${id}`);
+  }
+};
+
+// Chat API
+export const chatApi = {
+  // Channel management
+  getChannels: async (): Promise<ChatChannel[]> => {
+    try {
+      const response = await API.get<ApiResponse<ChatChannel[]>>('/chat/channels');
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
+  },
+
+  createChannel: async (channelData: {
+    name: string;
+    type: 'public' | 'private';
+    description?: string;
+    members?: string[];
+  }): Promise<ChatChannel> => {
+    try {
+      const response = await API.post<ApiResponse<ChatChannel>>('/chat/channels', channelData);
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  getChannel: async (channelId: string): Promise<ChatChannel | null> => {
+    try {
+      const response = await API.get<ApiResponse<ChatChannel>>(`/chat/channels/${channelId}`);
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      return null;
+    }
+  },
+
+  updateChannel: async (channelId: string, updates: Partial<ChatChannel>): Promise<ChatChannel> => {
+    try {
+      const response = await API.put<ApiResponse<ChatChannel>>(`/chat/channels/${channelId}`, updates);
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  deleteChannel: async (channelId: string): Promise<void> => {
+    try {
+      await API.delete(`/chat/channels/${channelId}`);
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  // Message management
+  getChannelMessages: async (channelId: string, limit: number = 50): Promise<ChatMessage[]> => {
+    try {
+      const response = await API.get<ApiResponse<ChatMessage[]>>(`/chat/channels/${channelId}/messages?limit=${limit}`);
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
+  },
+
+  sendChannelMessage: async (channelId: string, messageData: {
+    content: string;
+    type?: 'text' | 'file';
+    files?: Array<{
+      name: string;
+      url: string;
+      type: string;
+      size: number;
+      preview?: string;
+    }>;
+    replyTo?: string;
+  }): Promise<ChatMessage> => {
+    try {
+      const response = await API.post<ApiResponse<ChatMessage>>(`/chat/channels/${channelId}/messages`, messageData);
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  getDirectMessages: async (userId: string, limit: number = 50): Promise<ChatMessage[]> => {
+    try {
+      const response = await API.get<ApiResponse<ChatMessage[]>>(`/chat/direct-messages/${userId}?limit=${limit}`);
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
+  },
+
+  sendDirectMessage: async (userId: string, messageData: {
+    content: string;
+    type?: 'text' | 'file';
+    files?: Array<{
+      name: string;
+      url: string;
+      type: string;
+      size: number;
+      preview?: string;
+    }>;
+    replyTo?: string;
+  }): Promise<ChatMessage> => {
+    try {
+      const response = await API.post<ApiResponse<ChatMessage>>(`/chat/direct-messages/${userId}`, messageData);
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  updateMessage: async (messageId: string, updates: Partial<ChatMessage>): Promise<ChatMessage> => {
+    try {
+      const response = await API.put<ApiResponse<ChatMessage>>(`/chat/messages/${messageId}`, updates);
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  deleteMessage: async (messageId: string): Promise<void> => {
+    try {
+      await API.delete(`/chat/messages/${messageId}`);
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  markMessageAsRead: async (messageId: string): Promise<void> => {
+    try {
+      await API.post(`/chat/messages/${messageId}/read`);
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  // User management
+  getChatUsers: async (): Promise<ChatUser[]> => {
+    try {
+      const response = await API.get<ApiResponse<ChatUser[]>>('/chat/users');
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
+  },
+
+  updateUserStatus: async (userId: string, status: 'online' | 'away' | 'offline'): Promise<void> => {
+    try {
+      await API.put(`/chat/users/${userId}/status`, { status });
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  // Search messages
+  searchMessages: async (query: string, channelId?: string, userId?: string): Promise<ChatMessage[]> => {
+    try {
+      const params = new URLSearchParams({ query });
+      if (channelId) params.append('channelId', channelId);
+      if (userId) params.append('userId', userId);
+      
+      const response = await API.get<ApiResponse<ChatMessage[]>>(`/chat/search?${params.toString()}`);
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
   }
 }; 

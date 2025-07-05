@@ -1,0 +1,442 @@
+# SharpCRM Documentation
+
+## Table of Contents
+1. Introduction
+2. System Architecture
+3. Technical Stack
+4. Features & Functionality
+5. Security & Authentication
+6. Development Guide
+7. API Documentation
+8. Deployment Guide
+9. Troubleshooting
+10. Future Roadmap
+
+## 1. Introduction
+
+### 1.1 Purpose
+SharpCRM is an enterprise-grade Customer Relationship Management system designed to streamline business operations, enhance customer relationships, and provide comprehensive analytics for data-driven decision making.
+
+### 1.2 Scope
+This documentation covers all aspects of SharpCRM, including technical implementation, features, security measures, and development guidelines.
+
+### 1.3 Target Audience
+- Developers
+- System Administrators
+- Project Managers
+- End Users
+
+## 2. System Architecture
+
+### 2.1 High-Level Architecture
+SharpCRM follows a modern microservices architecture with the following key components:
+
+#### Frontend Layer
+- React-based SPA (Single Page Application)
+- Component-based architecture
+- State management with Zustand
+- Real-time updates via WebSocket
+
+#### Backend Layer
+- Node.js with Express
+- RESTful API design
+- WebSocket server for real-time features
+- Middleware for authentication and logging
+
+#### Database Layer
+- Amazon DynamoDB
+- Multi-tenant data structure
+- Optimized for high-performance queries
+
+### 2.2 Data Flow
+1. Client requests initiated from React frontend
+2. Authentication middleware validates JWT tokens
+3. Business logic processed in Express backend
+4. Data persistence handled by DynamoDB
+5. Real-time updates via WebSocket connections
+
+## 3. Technical Stack
+
+### 3.1 Frontend Technologies
+#### Core Framework
+- React 18.3.1
+- TypeScript for type safety
+- Vite 5.4.2 build tool
+
+#### State Management
+- Zustand 4.4.7
+- Custom hooks for business logic
+- Local storage integration
+
+#### UI Components
+- TailwindCSS 3.4.1
+- Headless UI components
+- Lucide React icons
+- DND Kit for drag-and-drop
+- Emoji Mart for chat features
+
+#### Data Visualization
+- Recharts 2.15.3
+- Custom chart components
+- Interactive dashboards
+
+#### Utilities
+- date-fns 4.1.0
+- Axios 1.10.0
+- React Router DOM 6.26.1
+
+### 3.2 Backend Technologies
+#### Server Framework
+- Node.js with TypeScript
+- Express 5.1.0
+- WebSocket (ws 8.18.3)
+
+#### Database
+- Amazon DynamoDB
+- AWS SDK integration
+- Optimized queries and indexes
+
+#### Authentication
+- JWT (jsonwebtoken 9.0.2)
+- bcryptjs 2.4.3
+- Role-based access control
+
+#### Development Tools
+- TypeScript
+- ESLint
+- Prettier
+- Nodemon
+
+## 4. Features & Functionality
+
+### 4.1 Core CRM Features
+
+#### Contact Management
+- Contact creation and editing
+- Contact history tracking
+- Communication logs
+- Custom fields support
+- Contact categorization
+- Import/Export capabilities
+
+#### Lead Management
+- Lead capture forms
+- Lead scoring system
+- Conversion tracking
+- Source attribution
+- Follow-up reminders
+- Pipeline visualization
+
+#### Deal Management
+- Deal pipeline stages
+- Value tracking
+- Win/Loss probability
+- Related contacts
+- Activity history
+- Revenue forecasting
+
+#### Task Management
+- Task creation
+- Assignment system
+- Due date tracking
+- Priority levels
+- Status updates
+- Task dependencies
+
+#### Account Management
+- Account hierarchy
+- Relationship mapping
+- Activity tracking
+- Revenue tracking
+- Team assignments
+- Custom fields
+
+### 4.2 Advanced Features
+
+#### Analytics & Reporting
+- Real-time dashboards
+- Custom report builder
+- Scheduled reports
+- Export capabilities
+- Data visualization
+- KPI tracking
+
+#### Team Collaboration
+- Real-time chat
+- Emoji support
+- File sharing
+- @mentions
+- Notifications
+- Activity feed
+
+#### Access Control
+- Role-based permissions
+- Multi-tenant support
+- User management
+- Activity logging
+- IP restrictions
+- Session management
+
+#### Integration Features
+- Email integration
+- Calendar sync
+- API endpoints
+- Webhook support
+- Third-party apps
+- Data import/export
+
+### 4.3 User Interface
+
+#### View Options
+- Grid view
+- Kanban board
+- Timeline view
+- Chart view
+- List view
+- Calendar view
+
+#### Common Components
+- Data tables
+- Modal dialogs
+- Form elements
+- Date pickers
+- File uploaders
+- Search filters
+
+## 5. Security & Authentication
+
+### 5.1 Authentication System
+```typescript
+// Authentication Middleware
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  
+  if (!token) {
+    res.status(401).json({ error: "No token provided" });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    // ... token validation logic
+  } catch (error) {
+    res.status(403).json({ error: "Invalid token" });
+  }
+};
+```
+
+### 5.2 Security Features
+- JWT token authentication
+- Password hashing with bcrypt
+- CORS protection
+- Rate limiting
+- Input validation
+- XSS protection
+
+### 5.3 Data Security
+- Encrypted data storage
+- Secure API endpoints
+- Audit logging
+- Backup systems
+- Data retention policies
+
+## 6. Development Guide
+
+### 6.1 Setup Instructions
+```bash
+# Clone repository
+git clone [repository-url]
+
+# Frontend setup
+cd frontend
+npm install
+npm run dev
+
+# Backend setup
+cd backend
+npm install
+npm run dev:init
+```
+
+### 6.2 Environment Configuration
+```env
+# Backend (.env)
+JWT_SECRET=your-secret-key
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-key
+DYNAMODB_ENDPOINT=http://localhost:8000
+
+# Frontend (.env)
+VITE_API_URL=http://localhost:3000
+VITE_WS_URL=ws://localhost:3001
+```
+
+### 6.3 Development Workflow
+1. Feature branch creation
+2. Local development
+3. Testing
+4. Code review
+5. Merge to main
+6. Deployment
+
+## 7. API Documentation
+
+### 7.1 Authentication Endpoints
+```typescript
+POST /api/auth/login
+POST /api/auth/register
+POST /api/auth/refresh-token
+POST /api/auth/logout
+```
+
+### 7.2 Core Endpoints
+```typescript
+// Contacts
+GET /api/contacts
+POST /api/contacts
+PUT /api/contacts/:id
+DELETE /api/contacts/:id
+
+// Leads
+GET /api/leads
+POST /api/leads
+PUT /api/leads/:id
+DELETE /api/leads/:id
+
+// Deals
+GET /api/deals
+POST /api/deals
+PUT /api/deals/:id
+DELETE /api/deals/:id
+```
+
+### 7.3 WebSocket Events
+```typescript
+// Connection events
+'connection'
+'disconnect'
+
+// Real-time updates
+'message'
+'notification'
+'status-change'
+```
+
+## 8. Deployment Guide
+
+### 8.1 Production Build
+```bash
+# Frontend build
+npm run build
+
+# Backend build
+npm run build:clean
+```
+
+### 8.2 Deployment Checklist
+- Environment variables
+- Database migrations
+- SSL certificates
+- Domain configuration
+- Load balancer setup
+- Monitoring setup
+
+### 8.3 Infrastructure Requirements
+- Node.js runtime
+- DynamoDB tables
+- Web server (Nginx/Apache)
+- SSL certificate
+- Domain name
+- AWS credentials
+
+## 9. Troubleshooting
+
+### 9.1 Common Issues
+- Authentication errors
+- Database connection issues
+- WebSocket disconnections
+- Build failures
+- Performance problems
+
+### 9.2 Logging
+- Application logs
+- Error tracking
+- Performance monitoring
+- User activity logs
+- Security audit logs
+
+### 9.3 Support Contacts
+- Development team
+- System administrators
+- Security team
+- Database administrators
+
+## 10. Future Roadmap
+
+### 10.1 Planned Features
+- Mobile applications
+- AI-powered insights
+- Advanced automation
+- Enhanced integrations
+- Custom workflows
+- Offline support
+
+### 10.2 Technology Updates
+- Framework updates
+- Security enhancements
+- Performance optimizations
+- UI/UX improvements
+- API expansions
+
+### 10.3 Timeline
+- Q1: Mobile app development
+- Q2: AI integration
+- Q3: Workflow automation
+- Q4: Integration expansion
+
+## Appendix
+
+### A. Database Schema
+```typescript
+// DynamoDB Tables
+TABLES = {
+  USERS: {
+    userId: string
+    email: string
+    firstName: string
+    lastName: string
+    role: string
+    tenantId: string
+  },
+  CONTACTS: {
+    contactId: string
+    name: string
+    email: string
+    phone: string
+    company: string
+  },
+  // ... other table definitions
+}
+```
+
+### B. Environment Setup
+- Development tools
+- IDE configuration
+- Git workflow
+- Code standards
+- Testing framework
+
+### C. Security Policies
+- Password requirements
+- Access control matrix
+- Data retention
+- Backup procedures
+- Incident response
+
+### D. Glossary
+- Technical terms
+- Business terms
+- Acronyms
+- System components
+- Feature definitions 

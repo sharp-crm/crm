@@ -12,6 +12,7 @@ import usersRoutes from "./routes/users";
 import notificationsRoutes from "./routes/notifications";
 import analyticsRoutes from "./routes/analytics";
 import reportsRoutes from "./routes/reports";
+import chatRoutes from "./routes/chat";
 import { authenticate } from "./middlewares/authenticate";
 import { errorHandler } from "./middlewares/errorHandler";
 import { requestLogger } from "./middlewares/requestLogger";
@@ -54,6 +55,7 @@ app.use("/api/users", authenticate, usersRoutes);
 app.use("/api/notifications", authenticate, notificationsRoutes);
 app.use("/api/analytics", authenticate, analyticsRoutes);
 app.use("/api/reports", authenticate, reportsRoutes);
+app.use("/api/chat", authenticate, chatRoutes);
 
 // 404 handler
 app.use((req, res) => {
