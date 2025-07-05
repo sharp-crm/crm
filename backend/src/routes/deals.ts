@@ -191,8 +191,6 @@ const createDeal: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    console.log('🔍 Creating deal with body:', req.body);
-
     const dealInput: CreateDealInput = {
       dealOwner: req.body.dealOwner,
       dealName: req.body.dealName,
@@ -206,8 +204,6 @@ const createDeal: RequestHandler = async (req: any, res) => {
     };
 
     const deal = await dealsService.createDeal(dealInput, userId, req.user.email, tenantId);
-
-    console.log('✅ Deal created successfully:', deal.id);
 
     res.status(201).json({ 
       message: "Deal created successfully", 

@@ -154,8 +154,6 @@ export class LeadsService {
 
   // Get all leads for a tenant (excluding soft deleted)
   async getLeadsByTenant(tenantId: string, userId: string, includeDeleted = false): Promise<Lead[]> {
-    console.log('🔍 getLeadsByTenant called with:', { tenantId, userId, includeDeleted });
-    
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'TenantIdIndex',
@@ -170,15 +168,6 @@ export class LeadsService {
         ...(includeDeleted ? {} : { ':isDeleted': false })
       }
     }));
-
-    console.log('📊 Raw DynamoDB result:', result.Items?.length, 'items');
-    console.log('📋 Items:', result.Items?.map(item => ({
-      id: item.id,
-      firstName: item.firstName,
-      visibleTo: item.visibleTo,
-      userId: item.userId,
-      createdBy: item.createdBy
-    })));
 
     return (result.Items || []) as Lead[];
   }

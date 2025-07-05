@@ -328,10 +328,6 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType,
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Debug: Log the form data to see what's being submitted
-    console.log('Form data being submitted:', formData);
-    console.log('visibleTo field:', formData.visibleTo);
-    
     const baseRecord = {
       id: Date.now().toString(),
       createdAt: new Date().toISOString().split('T')[0]
@@ -408,7 +404,7 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType,
             message: `Successfully created new contact: ${formData.firstName} ${formData.lastName}`
           });
           break;
-      case 'deal':
+        case 'deal':
           await dealsApi.create({
             dealOwner: formData.dealOwner,
             dealName: formData.dealName,
@@ -431,15 +427,15 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType,
             type: 'success',
             title: 'Deal Created',
             message: `Successfully created new deal: ${formData.dealName}`
-        });
-        break;
-      case 'task':
+          });
+          break;
+        case 'task':
           await tasksApi.create({
-          title: formData.subject,
-          description: formData.description || '',
+            title: formData.subject,
+            description: formData.description || '',
             priority: formData.priority || 'Medium',
             status: formData.status || 'Open',
-          dueDate: formData.dueDate,
+            dueDate: formData.dueDate,
             assignee: formData.assignedTo || user?.userId || '',
             type: 'Follow-up',
             tenantId: user?.tenantId || '',
@@ -478,10 +474,10 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType,
             type: 'success',
             title: 'Subsidiary Created',
             message: `Successfully created new subsidiary: ${formData.name}`
-        });
-        break;
-      case 'dealer':
-        await dealersApi.create({
+          });
+          break;
+        case 'dealer':
+          await dealersApi.create({
             name: formData.name || '',
             email: formData.email || '',
             phone: formData.phone || '',
@@ -499,8 +495,8 @@ const AddNewModal: React.FC<AddNewModalProps> = ({ isOpen, onClose, defaultType,
             type: 'success',
             title: 'Dealer Created',
             message: `Successfully created new dealer: ${formData.name}`
-        });
-        break;
+          });
+          break;
       }
 
       // Call onSuccess callback to refresh the UI
