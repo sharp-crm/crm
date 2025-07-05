@@ -37,19 +37,19 @@ const Tasks: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
 
-  const fetchTasks = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await tasksApi.getAll();
-      setTasks(data);
-    } catch (err) {
+    const fetchTasks = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await tasksApi.getAll();
+        setTasks(data);
+      } catch (err) {
       setError('Failed to load tasks. Please try again.');
-      console.error('Error fetching tasks:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+        console.error('Error fetching tasks:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
   useEffect(() => {
     fetchTasks();
@@ -405,7 +405,7 @@ const Tasks: React.FC = () => {
           />
         </>
       )}
-
+      
       <AddNewModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

@@ -41,8 +41,7 @@ const createDealsTable = async () => {
       { AttributeName: "tenantId", AttributeType: "S" },
       { AttributeName: "dealOwner", AttributeType: "S" },
       { AttributeName: "stage", AttributeType: "S" },
-      { AttributeName: "createdBy", AttributeType: "S" },
-      { AttributeName: "visibleTo", AttributeType: "S" }
+      { AttributeName: "createdBy", AttributeType: "S" }
     ],
     GlobalSecondaryIndexes: [
       {
@@ -76,15 +75,6 @@ const createDealsTable = async () => {
         IndexName: "CreatedByIndex",
         KeySchema: [
           { AttributeName: "createdBy", KeyType: "HASH" }
-        ],
-        Projection: {
-          ProjectionType: "ALL"
-        }
-      },
-      {
-        IndexName: "VisibleToIndex",
-        KeySchema: [
-          { AttributeName: "visibleTo", KeyType: "HASH" }
         ],
         Projection: {
           ProjectionType: "ALL"

@@ -13,7 +13,7 @@ const Dealers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [defaultType, setDefaultType] = useState<string | null>(null);
+  const [defaultType, setDefaultType] = useState<string | undefined>(undefined);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedDealer, setSelectedDealer] = useState<Dealer | null>(null);
@@ -133,7 +133,7 @@ const Dealers: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const dealer = dealers.find(d => d.id === id);
+    const dealer = dealers.find(d => d.id === id) || null;
     setDealerToDelete(id);
     setSelectedDealer(dealer);
     setDeleteConfirmOpen(true);

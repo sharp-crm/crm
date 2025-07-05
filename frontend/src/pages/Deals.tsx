@@ -143,12 +143,16 @@ const Deals: React.FC = () => {
     if (!dealToDelete) return;
     
     try {
+      setError(null);
       await dealsApi.delete(dealToDelete);
       setDeals(prev => prev.filter(deal => deal.id !== dealToDelete));
       setDeleteConfirmOpen(false);
       setDealToDelete(null);
     } catch (err) {
+      console.error('Error deleting deal:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete deal');
+      setDeleteConfirmOpen(false);
+      setDealToDelete(null);
     }
   };
 
@@ -181,21 +185,30 @@ const Deals: React.FC = () => {
     <div className="flex items-center space-x-2">
       <button
         className="p-1 text-gray-400 hover:text-blue-600"
-        onClick={() => handleView(row)}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleView(row);
+        }}
         title="View Deal"
       >
         <Icons.Eye className="w-4 h-4" />
       </button>
       <button
         className="p-1 text-gray-400 hover:text-green-600"
-        onClick={() => handleEdit(row)}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleEdit(row);
+        }}
         title="Edit Deal"
       >
         <Icons.Edit2 className="w-4 h-4" />
       </button>
       <button 
         className="p-1 text-gray-400 hover:text-red-600"
-        onClick={() => handleDelete(row.id)}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDelete(row.id);
+        }}
         title="Delete Deal"
       >
         <Icons.Trash2 className="w-4 h-4" />

@@ -154,33 +154,47 @@ export class LeadsService {
 
   // Get all leads for a tenant (excluding soft deleted)
   async getLeadsByTenant(tenantId: string, userId: string, includeDeleted = false): Promise<Lead[]> {
+    console.log('🔍 getLeadsByTenant called with:', { tenantId, userId, includeDeleted });
+    
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'TenantIdIndex',
       KeyConditionExpression: 'tenantId = :tenantId',
       FilterExpression: includeDeleted 
-        ? '(attribute_not_exists(visibleTo) OR contains(visibleTo, :userId) OR userId = :userId)'
-        : 'isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR contains(visibleTo, :userId) OR userId = :userId)',
+        ? '(attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)'
+        : 'isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
       ExpressionAttributeValues: {
         ':tenantId': tenantId,
         ':userId': userId,
+        ':zero': 0,
         ...(includeDeleted ? {} : { ':isDeleted': false })
       }
     }));
+
+    console.log('📊 Raw DynamoDB result:', result.Items?.length, 'items');
+    console.log('📋 Items:', result.Items?.map(item => ({
+      id: item.id,
+      firstName: item.firstName,
+      visibleTo: item.visibleTo,
+      userId: item.userId,
+      createdBy: item.createdBy
+    })));
 
     return (result.Items || []) as Lead[];
   }
 
   // Get leads by owner
-  async getLeadsByOwner(leadOwner: string, tenantId: string): Promise<Lead[]> {
+  async getLeadsByOwner(leadOwner: string, tenantId: string, userId: string): Promise<Lead[]> {
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'LeadOwnerIndex',
       KeyConditionExpression: 'leadOwner = :leadOwner',
-      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted',
+      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
       ExpressionAttributeValues: {
         ':leadOwner': leadOwner,
         ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
         ':isDeleted': false
       }
     }));
@@ -189,16 +203,19 @@ export class LeadsService {
   }
 
   // Get lead by email
-  async getLeadByEmail(email: string, tenantId: string): Promise<Lead | null> {
+  async getLeadByEmail(email: string, tenantId: string, userId?: string): Promise<Lead | null> {
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'EmailIndex',
       KeyConditionExpression: 'email = :email',
-      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted',
+      FilterExpression: userId 
+        ? 'tenantId = :tenantId AND isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)'
+        : 'tenantId = :tenantId AND isDeleted = :isDeleted',
       ExpressionAttributeValues: {
         ':email': email,
         ':tenantId': tenantId,
-        ':isDeleted': false
+        ':isDeleted': false,
+        ...(userId ? { ':userId': userId, ':zero': 0 } : {})
       }
     }));
 
@@ -334,14 +351,16 @@ export class LeadsService {
   }
 
   // Search leads by various criteria
-  async searchLeads(tenantId: string, searchTerm: string): Promise<Lead[]> {
+  async searchLeads(tenantId: string, userId: string, searchTerm: string): Promise<Lead[]> {
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'TenantIdIndex',
       KeyConditionExpression: 'tenantId = :tenantId',
-      FilterExpression: 'isDeleted = :isDeleted AND (contains(firstName, :searchTerm) OR contains(lastName, :searchTerm) OR contains(company, :searchTerm) OR contains(email, :searchTerm))',
+      FilterExpression: 'isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId) AND (contains(firstName, :searchTerm) OR contains(lastName, :searchTerm) OR contains(company, :searchTerm) OR contains(email, :searchTerm))',
       ExpressionAttributeValues: {
         ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
         ':isDeleted': false,
         ':searchTerm': searchTerm
       }
@@ -350,8 +369,8 @@ export class LeadsService {
     return (result.Items || []) as Lead[];
   }
 
-  // Get leads statistics
-  async getLeadsStats(tenantId: string): Promise<{
+  // Get leads stats for analytics
+  async getLeadsStats(tenantId: string, userId: string): Promise<{
     total: number;
     byStatus: Record<string, number>;
     bySource: Record<string, number>;
@@ -359,33 +378,51 @@ export class LeadsService {
     avgValue: number;
     recentCount: number;
   }> {
-    const leads = await this.getLeadsByTenant(tenantId, '', false);
+    const result = await docClient.send(new QueryCommand({
+      TableName: this.tableName,
+      IndexName: 'TenantIdIndex',
+      KeyConditionExpression: 'tenantId = :tenantId',
+      FilterExpression: 'isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
+      ExpressionAttributeValues: {
+        ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
+        ':isDeleted': false
+      }
+    }));
+
+    const leads = result.Items || [];
     
-    const byStatus = leads.reduce((acc, lead) => {
-      acc[lead.leadStatus] = (acc[lead.leadStatus] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    // Calculate statistics
+    const byStatus: Record<string, number> = {};
+    const bySource: Record<string, number> = {};
+    let totalValue = 0;
+    let recentCount = 0;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const bySource = leads.reduce((acc, lead) => {
-      acc[lead.leadSource] = (acc[lead.leadSource] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const totalValue = leads.reduce((sum, lead) => sum + (lead.value || 0), 0);
-    const avgValue = leads.length > 0 ? totalValue / leads.length : 0;
-
-    // Count leads created in the last 30 days
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const recentCount = leads.filter(lead => 
-      new Date(lead.createdAt) >= thirtyDaysAgo
-    ).length;
+    leads.forEach(lead => {
+      // Count by status
+      byStatus[lead.leadStatus] = (byStatus[lead.leadStatus] || 0) + 1;
+      
+      // Count by source
+      bySource[lead.leadSource] = (bySource[lead.leadSource] || 0) + 1;
+      
+      // Sum total value
+      totalValue += lead.value || 0;
+      
+      // Count recent leads
+      if (new Date(lead.createdAt) >= thirtyDaysAgo) {
+        recentCount++;
+      }
+    });
 
     return {
       total: leads.length,
       byStatus,
       bySource,
       totalValue,
-      avgValue,
+      avgValue: leads.length > 0 ? totalValue / leads.length : 0,
       recentCount
     };
   }

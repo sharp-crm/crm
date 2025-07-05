@@ -189,8 +189,7 @@ const tables = [
       { AttributeName: "tenantId", AttributeType: "S" },
       { AttributeName: "dealOwner", AttributeType: "S" },
       { AttributeName: "stage", AttributeType: "S" },
-      { AttributeName: "createdBy", AttributeType: "S" },
-      { AttributeName: "visibleTo", AttributeType: "S" }
+      { AttributeName: "createdBy", AttributeType: "S" }
     ],
     GlobalSecondaryIndexes: [
       {
@@ -224,15 +223,6 @@ const tables = [
         IndexName: "CreatedByIndex",
         KeySchema: [
           { AttributeName: "createdBy", KeyType: "HASH" }
-        ],
-        Projection: {
-          ProjectionType: "ALL"
-        }
-      },
-      {
-        IndexName: "VisibleToIndex",
-        KeySchema: [
-          { AttributeName: "visibleTo", KeyType: "HASH" }
         ],
         Projection: {
           ProjectionType: "ALL"

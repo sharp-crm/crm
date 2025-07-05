@@ -117,14 +117,8 @@ const ViewContactModal: React.FC<ViewContactModalProps> = ({ isOpen, onClose, co
                       <p className="text-sm font-medium text-gray-600">Visible To</p>
                       <p className="text-gray-900">
                         {contact.visibleTo && contact.visibleTo.length > 0 
-                          ? contact.visibleTo.map(userId => {
-                              // Extract name from email if it's an email format
-                              if (userId.includes('@')) {
-                                return userId.split('@')[0];
-                              }
-                              return userId;
-                            }).join(', ')
-                          : 'Contact Owner Only'}
+                          ? contact.visibleTo.join(', ')
+                          : 'All Users'}
                       </p>
                     </div>
                   </div>
