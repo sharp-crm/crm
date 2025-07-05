@@ -12,14 +12,14 @@ const Profile: React.FC = () => {
     { label: 'Deals Closed', value: '23', icon: 'Target' },
     { label: 'Revenue Generated', value: '$1.2M', icon: 'DollarSign' },
     { label: 'Leads Converted', value: '145', icon: 'UserPlus' },
-    { label: 'Meetings Held', value: '89', icon: 'Calendar' },
+    { label: 'Tasks Completed', value: '89', icon: 'CheckSquare' }
   ];
 
   const recentActivity = [
     { action: 'Closed deal with Global Industries', time: '2 hours ago', type: 'success' },
     { action: 'Created new lead from website inquiry', time: '4 hours ago', type: 'info' },
-    { action: 'Updated account information for TechCorp', time: '6 hours ago', type: 'info' },
-    { action: 'Scheduled meeting with potential client', time: '1 day ago', type: 'info' },
+    { action: 'Updated task status', time: '6 hours ago', type: 'info' },
+    { action: 'Completed follow-up call with client', time: '1 day ago', type: 'info' }
   ];
 
   if (!user) {
@@ -34,11 +34,7 @@ const Profile: React.FC = () => {
         subtitle="Your personal dashboard and settings"
         breadcrumbs={[
           {
-            name: (
-              <Link to="/" className="text-blue-600 hover:underline">
-                Home
-              </Link>
-            ),
+            name: 'Home',
             path: '/',
           },
           { name: 'Profile' },
@@ -64,7 +60,7 @@ const Profile: React.FC = () => {
             </div>
             <div className="flex space-x-3">
               <Link
-                to="/settings/general/personal"
+                to="/settings/personal"
                 className="flex items-center px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 <Icons.Edit2 className="w-5 h-5 mr-2" />

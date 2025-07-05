@@ -76,14 +76,21 @@ export const useAuthStore = create<AuthState>((set) => ({
     // If not in session storage, try local storage
     if (!userStr || !accessToken || !refreshToken) {
       userStr = localStorage.getItem('user');
-      accessToken = localStorage.getItem('accessToken');
+      accessToken = localStorage.getItem('accessToken') || localStorage.getItem('authToken'); // Legacy support
       refreshToken = localStorage.getItem('refreshToken');
     }
 
-    if (userStr && accessToken && refreshToken) {
-      const user = JSON.parse(userStr);
-      set({ user, accessToken, refreshToken });
-    }
+          if (userStr && accessToken && refreshToken) {
+        try {
+          const user = JSON.parse(userStr);
+          set({ user, accessToken, refreshToken });
+        } catch (error) {
+          console.error('Error parsing stored user data:', error);
+          // Clear invalid data
+          sessionStorage.clear();
+          localStorage.clear();
+        }
+      }
   },
 
   // ✅ Manually update user fields like name, phone after PUT

@@ -50,7 +50,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
   const isEditingSelf = currentUser?.userId === user?.id;
   
   // Super admin and admin can only edit email for other users
-  const canEditOnlyEmail = !isEditingSelf && (currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN');
+  const canEditOnlyEmail = !isEditingSelf && (currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'SuperAdmin');
 
   useEffect(() => {
     if (user) {

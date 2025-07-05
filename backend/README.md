@@ -66,7 +66,7 @@ cp .env.example .env
 Edit `.env` with your configuration:
 ```env
 # Server Configuration
-PORT=8080
+PORT=3000
 NODE_ENV=development
 
 # Frontend URL for CORS
@@ -153,15 +153,6 @@ npm start
 - `POST /` - Create new task
 - `PUT /:id` - Update task
 - `DELETE /:id` - Delete task
-
-### Accounts (`/api/accounts`)
-- `GET /` - Get all accounts
-- `GET /:id` - Get account by ID
-- `POST /` - Create new account
-- `PUT /:id` - Update account
-- `DELETE /:id` - Delete account
-- `GET /industry/:industry` - Get accounts by industry
-- `GET /owner/:owner` - Get accounts by owner
 
 ### Analytics (`/api/analytics`)
 - `GET /overview` - Dashboard overview metrics

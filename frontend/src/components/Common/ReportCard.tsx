@@ -1,5 +1,5 @@
 import React from 'react';
-import { Report } from '../../data/mockReports';
+import { Report } from '../../types';
 import { Star, Clock } from 'lucide-react';
 
 const ReportCard: React.FC<{ report: Report }> = ({ report }) => {

@@ -21,10 +21,10 @@ const CalendarModal: React.FC<CalendarModalProps> = ({ isOpen, onClose }) => {
   const mockEvents: CalendarEvent[] = [
     {
       id: '1',
-      title: 'Sales Review Meeting',
+      title: 'Sales Call',
       date: '2024-01-22',
       time: '10:00 AM',
-      type: 'meeting',
+      type: 'call',
       attendees: ['Sarah Johnson', 'Mike Chen']
     },
     {
@@ -44,10 +44,10 @@ const CalendarModal: React.FC<CalendarModalProps> = ({ isOpen, onClose }) => {
     },
     {
       id: '4',
-      title: 'Proposal Presentation',
+      title: 'Review Task',
       date: '2024-01-25',
       time: '3:00 PM',
-      type: 'meeting',
+      type: 'task',
       attendees: ['Emily Davis', 'Alex Rodriguez']
     },
     {
@@ -133,7 +133,6 @@ const CalendarModal: React.FC<CalendarModalProps> = ({ isOpen, onClose }) => {
 
   const getEventTypeColor = (type: string) => {
     const colors = {
-      meeting: 'bg-blue-500',
       call: 'bg-green-500',
       task: 'bg-orange-500',
       demo: 'bg-purple-500'

@@ -18,17 +18,19 @@ import StatusBadge from '../Common/StatusBadge';
 
 interface KanbanViewProps {
   data: (Deal | Task)[];
-  onItemMove: (itemId: string, newStage: string) => void;
+  onItemMove: (itemId: string, newStage: Deal['stage'] | Task['status']) => void;
   type: 'deals' | 'tasks';
+  getUserName?: (userId: string) => string;
 }
 
 interface KanbanCardProps {
   item: Deal | Task;
   type: 'deals' | 'tasks';
   dragOverlay?: boolean;
+  getUserName?: (userId: string) => string;
 }
 
-const KanbanCard: React.FC<KanbanCardProps> = ({ item, type, dragOverlay = false }) => {
+const KanbanCard: React.FC<KanbanCardProps> = ({ item, type, dragOverlay = false, getUserName }) => {
   const {
     attributes,
     listeners,
@@ -59,39 +61,52 @@ const KanbanCard: React.FC<KanbanCardProps> = ({ item, type, dragOverlay = false
       style={style}
       {...(dragOverlay ? {} : attributes)}
       {...(dragOverlay ? {} : listeners)}
+      onClick={(e) => e.preventDefault()}
       className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 ${
         dragOverlay ? 'cursor-grabbing' : 'cursor-grab hover:shadow-md'
       } transition-shadow`}
     >
       <div className="flex items-start justify-between mb-2">
+        <div className="flex-1">
         <h4 className="font-medium text-gray-900 text-sm">
           {isDeal ? dealItem.name : taskItem.title}
         </h4>
-        <Icons.GripVertical className="w-4 h-4 text-gray-400" />
+          <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+            {isDeal ? dealItem.dealName : taskItem.description}
+          </p>
+        </div>
+        <Icons.GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
       </div>
 
       {isDeal ? (
         <>
-          <p className="text-sm text-gray-600 mb-2">{dealItem.account}</p>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mt-3">
             <span className="font-semibold text-green-600">
-              ${dealItem.value.toLocaleString()}
+              ${dealItem.value?.toLocaleString()}
             </span>
             <span className="text-xs text-gray-500">{dealItem.probability}%</span>
           </div>
           <div className="mt-2 text-xs text-gray-500">
-            Close: {new Date(dealItem.closeDate).toLocaleDateString()}
+            Close: {new Date(dealItem.closeDate || '').toLocaleDateString()}
           </div>
         </>
       ) : (
         <>
-          <p className="text-sm text-gray-600 mb-2 line-clamp-2">{taskItem.description}</p>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 mt-3">
             <StatusBadge status={taskItem.priority} variant="warning" />
-            <span className="text-xs text-gray-500">{taskItem.type}</span>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              {taskItem.type}
+            </span>
           </div>
-          <div className="text-xs text-gray-500">
-            Due: {new Date(taskItem.dueDate).toLocaleDateString()}
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center text-xs text-gray-500">
+              <Icons.Calendar className="w-3 h-3 mr-1" />
+              {new Date(taskItem.dueDate).toLocaleDateString()}
+            </div>
+            <div className="flex items-center text-xs text-gray-500">
+              <Icons.User className="w-3 h-3 mr-1" />
+              {getUserName ? getUserName(taskItem.assignee) : taskItem.assignee}
+            </div>
           </div>
         </>
       )}
@@ -107,10 +122,10 @@ const DroppableColumn: React.FC<{
   return <div ref={setNodeRef}>{children}</div>;
 };
 
-const KanbanView: React.FC<KanbanViewProps> = ({ data, onItemMove, type }) => {
+const KanbanView: React.FC<KanbanViewProps> = ({ data, onItemMove, type, getUserName }) => {
   const stages = type === 'deals'
-    ? ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost']
-    : ['Open', 'In Progress', 'Completed'];
+    ? ['Need Analysis', 'Value Proposition', 'Identify Decision Makers', 'Negotiation/Review', 'Closed Won', 'Closed Lost'] as const
+    : ['Open', 'In Progress', 'Follow Up', 'Completed'] as const;
 
   const [activeItem, setActiveItem] = useState<Deal | Task | null>(null);
 
@@ -128,7 +143,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ data, onItemMove, type }) => {
       const currentStage = type === 'deals' ? (item as Deal).stage : (item as Task).status;
 
       if (currentStage !== overContainer) {
-        onItemMove(activeId.toString(), overContainer);
+        onItemMove(activeId.toString(), overContainer as Deal['stage'] | Task['status']);
       }
     }
   };
@@ -143,6 +158,28 @@ const KanbanView: React.FC<KanbanViewProps> = ({ data, onItemMove, type }) => {
     });
   };
 
+  const getStageColor = (stage: string) => {
+    if (type === 'deals') {
+      const colors: Record<string, string> = {
+        'Need Analysis': '#3B82F6',
+        'Value Proposition': '#8B5CF6',
+        'Identify Decision Makers': '#F59E0B',
+        'Negotiation/Review': '#EF4444',
+        'Closed Won': '#10B981',
+        'Closed Lost': '#6B7280'
+      };
+      return colors[stage] || '#6B7280';
+    } else {
+      const colors: Record<string, string> = {
+        'Open': '#3B82F6',
+        'In Progress': '#F59E0B',
+        'Follow Up': '#8B5CF6',
+        'Completed': '#10B981'
+      };
+      return colors[stage] || '#6B7280';
+    }
+  };
+
   return (
     <DndContext
       collisionDetection={closestCenter}
@@ -155,13 +192,20 @@ const KanbanView: React.FC<KanbanViewProps> = ({ data, onItemMove, type }) => {
       <div className="flex space-x-6 overflow-x-auto pb-4">
         {stages.map((stage) => {
           const stageItems = getItemsByStage(stage);
+          const stageColor = getStageColor(stage);
 
           return (
             <DroppableColumn key={stage} id={stage}>
               <div className="flex-shrink-0 w-80">
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <div 
+                        className="w-3 h-3 rounded-full mr-2" 
+                        style={{ backgroundColor: stageColor }}
+                      />
                     <h3 className="font-semibold text-gray-900">{stage}</h3>
+                    </div>
                     <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs">
                       {stageItems.length}
                     </span>
@@ -170,7 +214,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ data, onItemMove, type }) => {
                   <SortableContext items={stageItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
                     <div className="space-y-3 min-h-[200px]">
                       {stageItems.map((item) => (
-                        <KanbanCard key={item.id} item={item} type={type} />
+                        <KanbanCard key={item.id} item={item} type={type} getUserName={getUserName} />
                       ))}
                     </div>
                   </SortableContext>
@@ -181,10 +225,9 @@ const KanbanView: React.FC<KanbanViewProps> = ({ data, onItemMove, type }) => {
         })}
       </div>
 
-      {/* 🔁 This is the drag preview */}
       <DragOverlay>
         {activeItem ? (
-          <KanbanCard item={activeItem} type={type} dragOverlay />
+          <KanbanCard item={activeItem} type={type} dragOverlay getUserName={getUserName} />
         ) : null}
       </DragOverlay>
     </DndContext>

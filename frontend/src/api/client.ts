@@ -12,7 +12,12 @@ const API = axios.create({
 // Add auth token to requests
 API.interceptors.request.use(
   (config) => {
-    const token = useAuthStore.getState().accessToken || localStorage.getItem('accessToken');
+    // Try to get token from multiple sources
+    const authStore = useAuthStore.getState();
+    const token = authStore.accessToken || 
+                  sessionStorage.getItem('accessToken') || 
+                  localStorage.getItem('accessToken');
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -51,9 +56,13 @@ API.interceptors.response.use(
 
     try {
       const authStore = useAuthStore.getState();
-      const refreshToken = authStore.refreshToken || localStorage.getItem('refreshToken');
+      const refreshToken = authStore.refreshToken || 
+                          sessionStorage.getItem('refreshToken') || 
+                          localStorage.getItem('refreshToken');
 
-      if (!refreshToken) throw new Error('No refresh token available');
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
 
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -70,9 +79,9 @@ API.interceptors.response.use(
       isRefreshing = true;
 
       const res = await axios.post('http://localhost:3000/api/auth/refresh', { refreshToken });
-      const { accessToken, refreshToken: newRefreshToken } = res.data;
+      const { accessToken, refreshToken: newRefreshToken } = res.data.data;
 
-      // Update both Zustand store and localStorage
+      // Update both Zustand store and storage
       const user = authStore.user || JSON.parse(localStorage.getItem('user') || '{}');
       authStore.login({
         userId: user.userId,
@@ -87,7 +96,10 @@ API.interceptors.response.use(
         refreshToken: newRefreshToken,
       });
 
+      // Update axios default header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
       originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+
       processQueue(null, accessToken);
       return axios(originalRequest);
     } catch (err) {

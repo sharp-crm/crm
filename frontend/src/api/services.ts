@@ -1,56 +1,128 @@
 import API from './client';
+import { Deal as DealType } from '../types';
 
 // Types for API responses
 export interface Lead {
   id: string;
-  name: string;
-  company: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  phone: string;
+  phone?: string;
+  company: string;
+  title?: string;
+  leadOwner: string;
+  leadSource: string;
+  leadStatus: string;
+  value?: number;
+  description?: string;
   source: string;
-  value: number;
   status: string;
-  tenantId: string;
+  // Address fields
+  street?: string;
+  area?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  zipCode?: string;
+  // Auditing fields
+  createdBy: string;
   createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  isDeleted?: boolean;
+  userId: string;
+  tenantId: string;
+  visibleTo?: string[];
 }
 
 export interface Contact {
   id: string;
-  name: string;
+  // Required fields from AddNewModal
+  contactOwner: string;
+  firstName: string;
+  companyName: string;
   email: string;
-  phone: string;
-  company: string;
-  position?: string;
-  status: string;
-  tenantId: string;
+  leadSource: string;
+  
+  // Optional fields from AddNewModal
+  phone?: string;
+  title?: string;
+  department?: string;
+  
+  // Address fields
+  street?: string;
+  area?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  zipCode?: string;
+  
+  // Additional field
+  description?: string;
+  status?: string;
+  
+  // Visibility field
+  visibleTo?: string[];
+  
+  // Auditing fields
+  createdBy: string;
   createdAt: string;
-  updatedAt?: string;
+  updatedBy: string;
+  updatedAt: string;
+  deletedBy?: string;
+  isDeleted: boolean;
+  deletedAt?: string;
+  userId: string;
+  tenantId: string;
 }
 
-export interface Deal {
-  id: string;
-  name: string;
-  account: string;
-  value: number;
-  stage: string;
-  probability: number;
-  closeDate: string;
-  owner: string;
-  tenantId: string;
+export interface Deal extends Omit<DealType, 'stage'> {
+  stage: DealType['stage'];
+  // Required fields from AddNewModal
+  dealOwner: string;
+  dealName: string;
+  leadSource: string;
+  amount: number;
+  
+  // Optional fields from AddNewModal  
+  description?: string;
+  
+  // Additional fields for deal functionality
+  value?: number; // same as amount for backward compatibility
+  probability?: number;
+  closeDate?: string;
+  
+  // Visibility field
+  visibleTo?: string[];
+  
+  // Backward compatibility fields
+  name?: string; // maps to dealName
+  owner?: string; // maps to dealOwner
+  
+  // Auditing fields
+  createdBy: string;
   createdAt: string;
+  updatedBy: string;
+  updatedAt: string;
+  deletedBy?: string;
+  isDeleted: boolean;
+  deletedAt?: string;
+  userId: string;
+  tenantId: string;
 }
 
 export interface Task {
   id: string;
   title: string;
   description: string;
-  priority: string;
-  status: string;
+  priority: 'Low' | 'Medium' | 'High';
+  status: 'Open' | 'In Progress' | 'Follow Up' | 'Completed';
   dueDate: string;
   assignee: string;
-  type: string;
+  type: 'Call' | 'Email' | 'Meeting' | 'Follow-up' | 'Demo';
   tenantId: string;
   createdAt: string;
+  visibleTo?: string[];
 }
 
 export interface ApiResponse<T> {
@@ -97,7 +169,7 @@ export const leadsApi = {
     }
   },
 
-  create: async (lead: Omit<Lead, 'id' | 'tenantId' | 'createdAt'>): Promise<Lead> => {
+  create: async (lead: Omit<Lead, 'id' | 'tenantId' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'isDeleted' | 'userId'>): Promise<Lead> => {
     try {
       const response = await API.post<ApiResponse<Lead>>('/leads', lead);
       return response.data.data;
@@ -149,7 +221,7 @@ export const contactsApi = {
     }
   },
 
-  create: async (contact: Omit<Contact, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>): Promise<Contact> => {
+  create: async (contact: Omit<Contact, 'id' | 'tenantId' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'isDeleted' | 'userId'>): Promise<Contact> => {
     try {
       const response = await API.post<ApiResponse<Contact>>('/contacts', contact);
       return response.data.data;
@@ -201,7 +273,7 @@ export const dealsApi = {
     }
   },
 
-  create: async (deal: Omit<Deal, 'id' | 'tenantId' | 'createdAt'>): Promise<Deal> => {
+  create: async (deal: Omit<Deal, 'id' | 'tenantId' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'isDeleted' | 'userId' | 'value' | 'name' | 'owner'>): Promise<Deal> => {
     try {
       const response = await API.post<ApiResponse<Deal>>('/deals', deal);
       return response.data.data;
@@ -224,6 +296,64 @@ export const dealsApi = {
   delete: async (id: string): Promise<void> => {
     try {
       await API.delete(`/deals/${id}`);
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  getByOwner: async (owner: string): Promise<Deal[]> => {
+    try {
+      const response = await API.get<ApiResponse<Deal[]>>(`/deals/owner/${owner}`);
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
+  },
+
+  getByStage: async (stage: string): Promise<Deal[]> => {
+    try {
+      const response = await API.get<ApiResponse<Deal[]>>(`/deals/stage/${stage}`);
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
+  },
+
+  search: async (query: string): Promise<Deal[]> => {
+    try {
+      const response = await API.get<ApiResponse<Deal[]>>(`/deals/search?q=${encodeURIComponent(query)}`);
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
+  },
+
+  getStats: async (): Promise<any> => {
+    try {
+      const response = await API.get<ApiResponse<any>>('/deals/stats');
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      return null;
+    }
+  },
+
+  restore: async (id: string): Promise<void> => {
+    try {
+      await API.post(`/deals/${id}/restore`);
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  hardDelete: async (id: string): Promise<void> => {
+    try {
+      await API.delete(`/deals/${id}/hard`);
     } catch (error) {
       handleApiError(error);
       throw error;
@@ -253,7 +383,7 @@ export const tasksApi = {
     }
   },
 
-  create: async (task: Omit<Task, 'id' | 'tenantId' | 'createdAt'>): Promise<Task> => {
+  create: async (task: Omit<Task, 'id' | 'createdAt'>): Promise<Task> => {
     try {
       const response = await API.post<ApiResponse<Task>>('/tasks', task);
       return response.data.data;
@@ -288,12 +418,19 @@ export interface Subsidiary {
   id: string;
   name: string;
   email: string;
-  address: string;
   contact: string;
-  totalEmployees: number;
-  tenantId: string;
+  address: string;
+  numberOfEmployees: number;
+  visibleTo?: string[];
+  createdBy: string;
   createdAt: string;
+  updatedBy?: string;
   updatedAt?: string;
+  deletedBy?: string;
+  isDeleted: boolean;
+  deletedAt?: string;
+  userId: string;
+  tenantId: string;
 }
 
 export const subsidiariesApi = {
@@ -317,7 +454,7 @@ export const subsidiariesApi = {
     }
   },
 
-  create: async (subsidiary: Omit<Subsidiary, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>): Promise<Subsidiary> => {
+  create: async (subsidiary: Omit<Subsidiary, 'id' | 'createdBy' | 'createdAt' | 'updatedBy' | 'updatedAt' | 'deletedBy' | 'isDeleted' | 'deletedAt' | 'userId' | 'tenantId'>): Promise<Subsidiary> => {
     try {
       const response = await API.post<ApiResponse<Subsidiary>>('/subsidiaries', subsidiary);
       return response.data.data;
@@ -344,6 +481,47 @@ export const subsidiariesApi = {
       handleApiError(error);
       throw error;
     }
+  },
+
+  restore: async (id: string): Promise<void> => {
+    try {
+      await API.patch(`/subsidiaries/${id}/restore`);
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  hardDelete: async (id: string): Promise<void> => {
+    try {
+      await API.delete(`/subsidiaries/${id}/hard`);
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  search: async (searchTerm: string, limit?: number): Promise<Subsidiary[]> => {
+    try {
+      const params = new URLSearchParams({ q: searchTerm });
+      if (limit) params.append('limit', limit.toString());
+      
+      const response = await API.get<ApiResponse<Subsidiary[]>>(`/subsidiaries/search?${params}`);
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
+  },
+
+  getStats: async (): Promise<any> => {
+    try {
+      const response = await API.get<ApiResponse<any>>('/subsidiaries/stats');
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      return null;
+    }
   }
 };
 
@@ -354,12 +532,16 @@ export interface Dealer {
   email: string;
   phone: string;
   company: string;
-  location: string;
-  territory: string;
-  status: string;
-  tenantId: string;
+  visibleTo?: string[];
+  createdBy: string;
   createdAt: string;
+  updatedBy?: string;
   updatedAt?: string;
+  deletedBy?: string;
+  isDeleted: boolean;
+  deletedAt?: string;
+  userId: string;
+  tenantId: string;
 }
 
 export const dealersApi = {
@@ -383,7 +565,7 @@ export const dealersApi = {
     }
   },
 
-  create: async (dealer: Omit<Dealer, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>): Promise<Dealer> => {
+  create: async (dealer: Omit<Dealer, 'id' | 'createdBy' | 'createdAt' | 'updatedBy' | 'updatedAt' | 'deletedBy' | 'isDeleted' | 'deletedAt' | 'userId' | 'tenantId'>): Promise<Dealer> => {
     try {
       const response = await API.post<ApiResponse<Dealer>>('/dealers', dealer);
       return response.data.data;
@@ -409,6 +591,57 @@ export const dealersApi = {
     } catch (error) {
       handleApiError(error);
       throw error;
+    }
+  },
+
+  restore: async (id: string): Promise<void> => {
+    try {
+      await API.patch(`/dealers/${id}/restore`);
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  hardDelete: async (id: string): Promise<void> => {
+    try {
+      await API.delete(`/dealers/${id}/hard`);
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  search: async (searchTerm: string, limit?: number): Promise<Dealer[]> => {
+    try {
+      const params = new URLSearchParams({ q: searchTerm });
+      if (limit) params.append('limit', limit.toString());
+      
+      const response = await API.get<ApiResponse<Dealer[]>>(`/dealers/search?${params}`);
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
+    }
+  },
+
+  getStats: async (): Promise<any> => {
+    try {
+      const response = await API.get<ApiResponse<any>>('/dealers/stats');
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      return null;
+    }
+  },
+
+  getByTerritory: async (territory: string): Promise<Dealer[]> => {
+    try {
+      const response = await API.get<ApiResponse<Dealer[]>>(`/dealers/territory/${encodeURIComponent(territory)}`);
+      return response.data.data || [];
+    } catch (error) {
+      handleApiError(error);
+      return [];
     }
   }
 };
@@ -679,7 +912,7 @@ export const analyticsApi = {
       ]);
 
       const completedTasks = tasks.filter(t => t.status === 'Completed').length;
-      const pendingTasks = tasks.filter(t => t.status === 'In Progress' || t.status === 'Not Started').length;
+      const pendingTasks = tasks.filter(t => t.status === 'In Progress' || t.status === 'Open').length;
 
       return {
         totalActivities: tasks.length + leads.length + contacts.length,
@@ -717,5 +950,39 @@ export const analyticsApi = {
       console.error('Chart data error:', error);
       return [];
     }
+  }
+};
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  tenantId: string;
+}
+
+export const usersApi = {
+  getAll: async (): Promise<User[]> => {
+    const response = await API.get('/users');
+    return response.data.data;
+  },
+
+  getById: async (id: string): Promise<User> => {
+    const response = await API.get(`/users/${id}`);
+    return response.data.data;
+  },
+
+  create: async (data: Partial<User>): Promise<User> => {
+    const response = await API.post('/users', data);
+    return response.data.data;
+  },
+
+  update: async (id: string, data: Partial<User>): Promise<User> => {
+    const response = await API.put(`/users/${id}`, data);
+    return response.data.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await API.delete(`/users/${id}`);
   }
 }; 

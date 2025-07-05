@@ -47,9 +47,13 @@ API.interceptors.response.use(
 
     try {
       const authStore = useAuthStore.getState();
-      const refreshToken = authStore.refreshToken;
+      const refreshToken = authStore.refreshToken || 
+                          sessionStorage.getItem('refreshToken') || 
+                          localStorage.getItem('refreshToken');
 
-      if (!refreshToken) throw new Error('No refresh token available');
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
 
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -68,25 +72,34 @@ API.interceptors.response.use(
       const res = await refreshTokenRequest(refreshToken);
       const { accessToken, refreshToken: newRefreshToken } = res.data;
 
+      if (!accessToken || !newRefreshToken) {
+        throw new Error('Invalid refresh token response');
+      }
+
+      // Update both Zustand store and storage
+      const user = authStore.user || JSON.parse(localStorage.getItem('user') || '{}');
       authStore.login({
-        userId: authStore.user?.userId || '',
-        email: authStore.user?.email || '',
-        firstName: authStore.user?.firstName || '',
-        lastName: authStore.user?.lastName || '',
-        role: authStore.user?.role || '',
-        tenantId: authStore.user?.tenantId,
-        createdBy: authStore.user?.createdBy,
-        phoneNumber: authStore.user?.phoneNumber,
+        userId: user.userId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        tenantId: user.tenantId,
+        createdBy: user.createdBy,
+        phoneNumber: user.phoneNumber,
         accessToken,
         refreshToken: newRefreshToken,
       });
 
+      // Update axios default header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
       originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+
       processQueue(null, accessToken);
       return axios(originalRequest);
     } catch (err) {
       processQueue(err, null);
-      const authStore = useAuthStore.getState(); // pulls the state AND methods
+      const authStore = useAuthStore.getState();
       authStore.logout();
       return Promise.reject(err);
     } finally {

@@ -404,7 +404,6 @@ const Home: React.FC = () => {
               <thead>
                 <tr className="text-left text-gray-500 border-b border-gray-200">
                   <th className="pb-4 px-6"><span className="flex items-center"><Icons.Target className="w-5 h-5 mr-2" /> Deal Name</span></th>
-                  <th className="pb-4 px-6"><span className="flex items-center"><Icons.Building className="w-5 h-5 mr-2" /> Account</span></th>
                   <th className="pb-4 px-6"><span className="flex items-center"><Icons.Info className="w-5 h-5 mr-2" /> Stage</span></th>
                   <th className="pb-4 px-6"><span className="flex items-center"><Icons.Calendar className="w-5 h-5 mr-2" /> Expected Close Date</span></th>
                 </tr>
@@ -416,7 +415,6 @@ const Home: React.FC = () => {
                     <tr key={index} className="border-t border-gray-100 animate-pulse">
                       <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-36"></div></td>
                       <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-28"></div></td>
-                      <td className="py-4 px-6"><div className="h-6 bg-gray-200 rounded w-20"></div></td>
                       <td className="py-4 px-6"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
                     </tr>
                   ))
@@ -430,7 +428,6 @@ const Home: React.FC = () => {
                       onClick={() => navigate('/deals')}
                     >
                       <td className="py-4 px-6 text-gray-800">{deal.title}</td>
-                      <td className="py-4 px-6 text-gray-700">{deal.account || 'N/A'}</td>
                       <td className="py-4 px-6"><StatusBadge status={deal.stage} /></td>
                       <td className="py-4 px-6 text-gray-600">
                         {deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString() : 'N/A'}
@@ -439,7 +436,7 @@ const Home: React.FC = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-8 px-6 text-center text-gray-500">
+                    <td colSpan={3} className="py-8 px-6 text-center text-gray-500">
                       <div className="flex flex-col items-center">
                         <Icons.Target className="h-8 w-8 text-gray-400 mb-2" />
                         <p>No deals closing this month</p>

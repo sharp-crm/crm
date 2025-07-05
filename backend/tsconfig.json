@@ -8,8 +8,9 @@
     "forceConsistentCasingInFileNames": true, // Prevent casing mismatches
     "strict": true,                           // Strict type checking
     "skipLibCheck": true,                     // Speeds up compile, skip .d.ts checks
-    "resolveJsonModule": true                 // Allows importing JSON files
+    "resolveJsonModule": true,                // Allows importing JSON files
+    "typeRoots": ["./node_modules/@types", "./src/types"] // Add custom type definitions
   },
-  "include": ["src"],                         // Only compile src/ folder
+  "include": ["src/**/*"],                    // Include all files in src/
   "exclude": ["node_modules"]                 // Exclude node_modules
 }

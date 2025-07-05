@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Deal, Task, Lead, Contact, Account } from '../types';
+import { Deal, Task, Lead, Contact } from '../types';
 import { Dealer, Subsidiary } from '../api/services';
 
 interface CRMStore {
@@ -7,14 +7,12 @@ interface CRMStore {
   tasks: Task[];
   leads: Lead[];
   contacts: Contact[];
-  accounts: Account[];
   dealers: Dealer[];
   subsidiaries: Subsidiary[];
   addDeal: (deal: Deal) => void;
   addTask: (task: Task) => void;
   addLead: (lead: Lead) => void;
   addContact: (contact: Contact) => void;
-  addAccount: (account: Account) => void;
   addDealer: (dealer: Dealer) => void;
   addSubsidiary: (subsidiary: Subsidiary) => void;
   updateDeal: (id: string, updates: Partial<Deal>) => void;
@@ -26,14 +24,12 @@ export const useCRMStore = create<CRMStore>((set) => ({
   tasks: [],
   leads: [],
   contacts: [],
-  accounts: [],
   dealers: [],
   subsidiaries: [],
   addDeal: (deal) => set((state) => ({ deals: [...state.deals, deal] })),
   addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
   addLead: (lead) => set((state) => ({ leads: [...state.leads, lead] })),
   addContact: (contact) => set((state) => ({ contacts: [...state.contacts, contact] })),
-  addAccount: (account) => set((state) => ({ accounts: [...state.accounts, account] })),
   addDealer: (dealer) => set((state) => ({ dealers: [...state.dealers, dealer] })),
   addSubsidiary: (subsidiary) => set((state) => ({ subsidiaries: [...state.subsidiaries, subsidiary] })),
   updateDeal: (id, updates) => set((state) => ({

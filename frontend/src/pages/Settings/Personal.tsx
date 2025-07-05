@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import * as Icons from 'lucide-react';
-import PageHeader from '../../../components/Common/PageHeader';
-import { useAuthStore } from '../../../store/useAuthStore';
-import API from '../../../api/client';
-import avatar from '../../../Assets/avatar.png';
-import PhoneNumberInput from '../../../components/Common/PhoneNumberInput';
-import PasswordStrengthMeter from '../../../components/Common/PasswordStrengthMeter';
-import { validatePassword } from '../../../utils/passwordValidation';
+import PageHeader from '../../components/Common/PageHeader';
+import { useAuthStore } from '../../store/useAuthStore';
+import API from '../../api/client';
+import avatar from '../../Assets/avatar.png';
+import PhoneNumberInput from '../../components/Common/PhoneNumberInput';
+import PasswordStrengthMeter from '../../components/Common/PasswordStrengthMeter';
+import { validatePassword } from '../../utils/passwordValidation';
 
 const Personal: React.FC = () => {
   const user = useAuthStore((s) => s.user);

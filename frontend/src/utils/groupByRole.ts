@@ -1,9 +1,9 @@
-import { mockUsers } from '../data/mockData';
+import { User } from '../types';
 
-export const groupUsersByRole = () => {
-  const roleMap: { [role: string]: typeof mockUsers } = {};
+export const groupUsersByRole = (users: User[]) => {
+  const roleMap: { [role: string]: User[] } = {};
 
-  mockUsers.forEach((user) => {
+  users.forEach((user) => {
     if (!roleMap[user.role]) {
       roleMap[user.role] = [];
     }

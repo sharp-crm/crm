@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import PageHeader from '../components/Common/PageHeader';
-import AddNewUserModal from '../components/AddNewUserModal';
-import AllUsers from './AllUsersByDomain'; // ✅ Reused AllUsers component
-import { useAuthStore } from '../store/useAuthStore';
+import PageHeader from '../../components/Common/PageHeader';
+import AddNewUserModal from '../../components/AddNewUserModal';
+import AllUsers from '../AllUsersByDomain'; // ✅ Reused AllUsers component
+import { useAuthStore } from '../../store/useAuthStore';
 
 const AccessControl: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
@@ -18,7 +18,7 @@ const AccessControl: React.FC = () => {
       />
 
       {/* Add New Employee button (Admins only) */}
-      {currentUser?.role === 'ADMIN' && (
+      {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'SuperAdmin') && (
         <div className="mt-4 mb-6">
           <button
             onClick={() => setShowModal(true)}

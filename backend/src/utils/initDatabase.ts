@@ -9,21 +9,17 @@ import { DynamoDBDocumentClient, PutCommand, GetCommand } from "@aws-sdk/lib-dyn
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 
+// Use local DynamoDB configuration
 const clientConfig: any = {
-  region: process.env.AWS_REGION || "us-east-1",
+  region: "us-east-1",
+  endpoint: "http://localhost:8000",
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'fakeMyKeyId',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'fakeSecretAccessKey'
+    accessKeyId: "fakeMyKeyId",
+    secretAccessKey: "fakeSecretAccessKey"
   }
 };
 
-// Use local endpoint if specified
-if (process.env.DYNAMODB_ENDPOINT) {
-  clientConfig.endpoint = process.env.DYNAMODB_ENDPOINT;
-}
-
 const client = new DynamoDBClient(clientConfig);
-
 const docClient = DynamoDBDocumentClient.from(client);
 
 const tables = [
@@ -85,7 +81,49 @@ const tables = [
       { AttributeName: "id", KeyType: "HASH" }
     ],
     AttributeDefinitions: [
-      { AttributeName: "id", AttributeType: "S" }
+      { AttributeName: "id", AttributeType: "S" },
+      { AttributeName: "tenantId", AttributeType: "S" },
+      { AttributeName: "email", AttributeType: "S" },
+      { AttributeName: "createdBy", AttributeType: "S" },
+      { AttributeName: "contactOwner", AttributeType: "S" }
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "TenantIdIndex",
+        KeySchema: [
+          { AttributeName: "tenantId", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "EmailIndex",
+        KeySchema: [
+          { AttributeName: "email", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "CreatedByIndex",
+        KeySchema: [
+          { AttributeName: "createdBy", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "ContactOwnerIndex",
+        KeySchema: [
+          { AttributeName: "contactOwner", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      }
     ],
     BillingMode: "PAY_PER_REQUEST"
   },
@@ -95,7 +133,49 @@ const tables = [
       { AttributeName: "id", KeyType: "HASH" }
     ],
     AttributeDefinitions: [
-      { AttributeName: "id", AttributeType: "S" }
+      { AttributeName: "id", AttributeType: "S" },
+      { AttributeName: "tenantId", AttributeType: "S" },
+      { AttributeName: "email", AttributeType: "S" },
+      { AttributeName: "createdBy", AttributeType: "S" },
+      { AttributeName: "leadOwner", AttributeType: "S" }
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "TenantIdIndex",
+        KeySchema: [
+          { AttributeName: "tenantId", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "EmailIndex",
+        KeySchema: [
+          { AttributeName: "email", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "CreatedByIndex",
+        KeySchema: [
+          { AttributeName: "createdBy", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "LeadOwnerIndex",
+        KeySchema: [
+          { AttributeName: "leadOwner", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      }
     ],
     BillingMode: "PAY_PER_REQUEST"
   },
@@ -105,7 +185,59 @@ const tables = [
       { AttributeName: "id", KeyType: "HASH" }
     ],
     AttributeDefinitions: [
-      { AttributeName: "id", AttributeType: "S" }
+      { AttributeName: "id", AttributeType: "S" },
+      { AttributeName: "tenantId", AttributeType: "S" },
+      { AttributeName: "dealOwner", AttributeType: "S" },
+      { AttributeName: "stage", AttributeType: "S" },
+      { AttributeName: "createdBy", AttributeType: "S" },
+      { AttributeName: "visibleTo", AttributeType: "S" }
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "TenantIdIndex",
+        KeySchema: [
+          { AttributeName: "tenantId", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "DealOwnerIndex",
+        KeySchema: [
+          { AttributeName: "dealOwner", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "StageIndex",
+        KeySchema: [
+          { AttributeName: "stage", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "CreatedByIndex",
+        KeySchema: [
+          { AttributeName: "createdBy", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "VisibleToIndex",
+        KeySchema: [
+          { AttributeName: "visibleTo", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      }
     ],
     BillingMode: "PAY_PER_REQUEST"
   },
@@ -115,17 +247,49 @@ const tables = [
       { AttributeName: "id", KeyType: "HASH" }
     ],
     AttributeDefinitions: [
-      { AttributeName: "id", AttributeType: "S" }
+      { AttributeName: "id", AttributeType: "S" },
+      { AttributeName: "tenantId", AttributeType: "S" },
+      { AttributeName: "assignedTo", AttributeType: "S" },
+      { AttributeName: "createdBy", AttributeType: "S" },
+      { AttributeName: "dueDate", AttributeType: "S" }
     ],
-    BillingMode: "PAY_PER_REQUEST"
-  },
-  {
-    TableName: "Accounts",
-    KeySchema: [
-      { AttributeName: "id", KeyType: "HASH" }
-    ],
-    AttributeDefinitions: [
-      { AttributeName: "id", AttributeType: "S" }
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "TenantIdIndex",
+        KeySchema: [
+          { AttributeName: "tenantId", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "AssignedToIndex",
+        KeySchema: [
+          { AttributeName: "assignedTo", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "CreatedByIndex",
+        KeySchema: [
+          { AttributeName: "createdBy", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "DueDateIndex",
+        KeySchema: [
+          { AttributeName: "dueDate", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      }
     ],
     BillingMode: "PAY_PER_REQUEST"
   },
@@ -135,7 +299,39 @@ const tables = [
       { AttributeName: "id", KeyType: "HASH" }
     ],
     AttributeDefinitions: [
-      { AttributeName: "id", AttributeType: "S" }
+      { AttributeName: "id", AttributeType: "S" },
+      { AttributeName: "tenantId", AttributeType: "S" },
+      { AttributeName: "createdBy", AttributeType: "S" },
+      { AttributeName: "name", AttributeType: "S" }
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "TenantIdIndex",
+        KeySchema: [
+          { AttributeName: "tenantId", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "CreatedByIndex",
+        KeySchema: [
+          { AttributeName: "createdBy", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "NameIndex",
+        KeySchema: [
+          { AttributeName: "name", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      }
     ],
     BillingMode: "PAY_PER_REQUEST"
   },
@@ -145,22 +341,54 @@ const tables = [
       { AttributeName: "id", KeyType: "HASH" }
     ],
     AttributeDefinitions: [
-      { AttributeName: "id", AttributeType: "S" }
+      { AttributeName: "id", AttributeType: "S" },
+      { AttributeName: "tenantId", AttributeType: "S" },
+      { AttributeName: "createdBy", AttributeType: "S" },
+      { AttributeName: "name", AttributeType: "S" },
+      { AttributeName: "territory", AttributeType: "S" }
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "TenantIdIndex",
+        KeySchema: [
+          { AttributeName: "tenantId", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "CreatedByIndex",
+        KeySchema: [
+          { AttributeName: "createdBy", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "NameIndex",
+        KeySchema: [
+          { AttributeName: "name", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      },
+      {
+        IndexName: "TerritoryIndex",
+        KeySchema: [
+          { AttributeName: "territory", KeyType: "HASH" }
+        ],
+        Projection: {
+          ProjectionType: "ALL"
+        }
+      }
     ],
     BillingMode: "PAY_PER_REQUEST"
   },
   {
     TableName: "Notifications",
-    KeySchema: [
-      { AttributeName: "id", KeyType: "HASH" }
-    ],
-    AttributeDefinitions: [
-      { AttributeName: "id", AttributeType: "S" }
-    ],
-    BillingMode: "PAY_PER_REQUEST"
-  },
-  {
-    TableName: "Meetings",
     KeySchema: [
       { AttributeName: "id", KeyType: "HASH" }
     ],

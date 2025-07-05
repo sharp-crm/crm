@@ -1,4 +1,3 @@
-
 export interface Role {
   id: string;
   name: string;
@@ -14,18 +13,43 @@ export interface User {
   department: string;
 }
 
-
-
 export interface Lead {
   id: string;
-  name: string;
+  // Required fields from AddNewModal
+  leadOwner: string;
+  firstName: string;
+  lastName: string;
   company: string;
   email: string;
-  phone: string;
-  status: 'New' | 'Contacted' | 'Qualified' | 'Lost';
-  source: string;
+  leadSource: string;
+  leadStatus: string;
+  
+  // Optional fields from AddNewModal
+  phone?: string;
+  title?: string;
+  
+  // Address fields
+  street?: string;
+  area?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  zipCode?: string;
+  
+  // Additional fields
+  description?: string;
+  value?: number;
+  
+  // Auditing fields
+  createdBy: string;
   createdAt: string;
-  value: number;
+  updatedBy: string;
+  updatedAt: string;
+  deletedBy?: string;
+  isDeleted: boolean;
+  deletedAt?: string;
+  userId: string;
+  tenantId: string;
 }
 
 export interface Contact {
@@ -37,29 +61,41 @@ export interface Contact {
   position: string;
   status: 'Active' | 'Inactive';
   createdAt: string;
-}
-
-export interface Account {
-  id: string;
-  name: string;
-  industry: string;
-  revenue: number;
-  employees: number;
-  website: string;
-  status: 'Active' | 'Inactive';
-  owner: string;
+  visibleTo?: string[];
 }
 
 export interface Deal {
   id: string;
-  name: string;
-  account: string;
-  value: number;
-  stage: 'Prospecting' | 'Qualification' | 'Proposal' | 'Negotiation' | 'Closed Won' | 'Closed Lost';
-  probability: number;
-  closeDate: string;
-  owner: string;
+  // Required fields from AddNewModal
+  dealOwner: string;
+  dealName: string;
+  leadSource: string;
+  stage: 'Need Analysis' | 'Value Proposition' | 'Identify Decision Makers' | 'Negotiation/Review' | 'Closed Won' | 'Closed Lost' | 'Closed Lost to Competition';
+  amount: number;
+  visibleTo?: string[]; // Changed from required to optional
+  
+  // Optional fields from AddNewModal  
+  description?: string;
+  
+  // Additional fields for deal functionality
+  value?: number; // same as amount for backward compatibility
+  probability?: number;
+  closeDate?: string;
+  
+  // Backward compatibility fields
+  name?: string; // maps to dealName
+  owner?: string; // maps to dealOwner
+  
+  // Auditing fields
+  createdBy: string;
   createdAt: string;
+  updatedBy: string;
+  updatedAt: string;
+  deletedBy?: string;
+  isDeleted: boolean;
+  deletedAt?: string;
+  userId: string;
+  tenantId: string;
 }
 
 export interface Task {
@@ -67,21 +103,23 @@ export interface Task {
   title: string;
   description: string;
   priority: 'Low' | 'Medium' | 'High';
-  status: 'Open' | 'In Progress' | 'Completed';
+  status: 'Open' | 'In Progress' | 'Follow Up' | 'Completed';
   dueDate: string;
   assignee: string;
-  createdAt: string;
   type: 'Call' | 'Email' | 'Meeting' | 'Follow-up' | 'Demo';
-}
-
-export interface Meeting {
-  id: string;
-  title: string;
-  attendees: string[];
-  startTime: string;
-  endTime: string;
-  location: string;
-  status: 'Scheduled' | 'Completed' | 'Cancelled';
+  tenantId: string;
+  
+  // Audit fields
+  createdAt: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  isDeleted?: boolean;
+  
+  // Visibility field
+  visibleTo?: string[];
 }
 
 export interface Product {
@@ -120,3 +158,66 @@ export interface CalendarEvent {
 }
 
 export type ViewType = 'list' | 'kanban' | 'grid' | 'timeline' | 'chart';
+
+export interface Dealer {
+  id: string;
+  name: string;
+  type: string;
+  email: string;
+  phone: string;
+  website: string;
+  status: 'Active' | 'Inactive';
+  description: string;
+  createdAt: string;
+  visibleTo: string[];
+}
+
+export interface Subsidiary {
+  id: string;
+  name: string;
+  type: string;
+  email: string;
+  phone: string;
+  website: string;
+  registrationNumber: string;
+  status: 'Active' | 'Inactive';
+  description: string;
+  createdAt: string;
+  visibleTo: string[];
+}
+
+export interface TenantUser {
+  id?: string;
+  userId?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;  // Add role property
+  tenantId: string;
+}
+
+export interface FormFieldOption {
+  value: string;
+  label: string;
+}
+
+export interface FormField {
+  name: string;
+  label: string;
+  type: string;
+  required?: boolean;
+  options?: FormFieldOption[];
+  group?: string;
+  help?: string;  // Add help property for field description
+}
+
+export type Report = {
+  id: string;
+  title: string;
+  module: string;
+  createdBy: string;
+  createdAt: string;
+  lastViewed?: string;
+  isFavorite?: boolean;
+  schedule?: string;
+};
