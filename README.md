@@ -105,7 +105,7 @@ npm run init-db
 npm run dev
 ```
 
-The backend will run on `http://localhost:8080`
+The backend will run on `http://localhost:3000`
 
 ### 3. Frontend Setup
 ```bash
@@ -162,7 +162,7 @@ The frontend will run on `http://localhost:5173`
 
 #### Backend (.env)
 ```env
-PORT=8080
+PORT=3000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 JWT_SECRET=your-jwt-secret
@@ -174,7 +174,7 @@ DYNAMODB_ENDPOINT=http://localhost:8000  # For local development
 ```
 
 #### Frontend
-The frontend automatically connects to the backend on `http://localhost:8080` in development.
+The frontend automatically connects to the backend on `http://localhost:3000` in development.
 
 ## 🚀 Deployment
 

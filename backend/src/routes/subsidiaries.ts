@@ -1,191 +1,245 @@
 import { Router, RequestHandler } from 'express';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
-import { v4 as uuidv4 } from "uuid";
-import { authenticate } from "../middlewares/authenticate";
+import { subsidiariesService, CreateSubsidiaryInput, UpdateSubsidiaryInput } from '../services/subsidiaries';
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    userId: string;
+    email: string;
+    tenantId: string;
+    role: string;
+  };
+}
 
 const router = Router();
-const client = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(client);
-
-// Apply authentication middleware to all routes
-router.use(authenticate);
 
 // Get all subsidiaries for the current tenant
-const getAllSubsidiaries: RequestHandler = async (req, res) => {
+const getAllSubsidiaries: RequestHandler = async (req: any, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId;
+    const { tenantId, userId, role } = req.user;
     
     if (!tenantId) {
-      res.status(400).json({ error: "Tenant ID is required" });
+      res.status(400).json({ error: "Tenant ID required" });
       return;
     }
 
-    const result = await docClient.send(new QueryCommand({
-      TableName: "Subsidiaries",
-      IndexName: "TenantIdIndex",
-      KeyConditionExpression: "tenantId = :tenantId",
-      ExpressionAttributeValues: {
-        ":tenantId": tenantId
-      }
-    }));
-
-    res.json({ data: result.Items || [] });
+    const subsidiaries = await subsidiariesService.getSubsidiariesByTenant(tenantId, userId, role);
+    
+    res.json({ 
+      data: subsidiaries,
+      total: subsidiaries.length 
+    });
   } catch (error) {
     console.error('Get subsidiaries error:', error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
 // Get subsidiary by ID
-const getSubsidiaryById: RequestHandler = async (req, res) => {
+const getSubsidiaryById: RequestHandler = async (req: any, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId;
+    const { tenantId } = req.user;
+    const { id } = req.params;
     
-    const result = await docClient.send(new GetCommand({
-      TableName: "Subsidiaries",
-      Key: { id: req.params.id }
-    }));
-
-    if (!result.Item) {
+    const subsidiary = await subsidiariesService.getSubsidiaryById(id, tenantId);
+    
+    if (!subsidiary) {
       res.status(404).json({ error: "Subsidiary not found" });
       return;
     }
 
-    // Verify tenant ownership
-    if (result.Item.tenantId !== tenantId) {
-      res.status(403).json({ error: "Access denied" });
-      return;
-    }
-
-    res.json({ data: result.Item });
+    res.json({ data: subsidiary });
   } catch (error) {
     console.error('Get subsidiary error:', error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Get all subsidiaries for a tenant
+const getSubsidiaries: RequestHandler = async (req: any, res) => {
+  try {
+    const { tenantId, userId, role } = req.user;
+    const subsidiaries = await subsidiariesService.getSubsidiariesByTenant(tenantId, userId, role);
+    res.json({ data: subsidiaries });
+  } catch (error) {
+    console.error('Error fetching subsidiaries:', error);
+    res.status(500).json({ error: 'Failed to fetch subsidiaries' });
   }
 };
 
 // Create new subsidiary
-const createSubsidiary: RequestHandler = async (req, res) => {
+const createSubsidiary: RequestHandler = async (req: any, res) => {
   try {
-    const { name, email, address, contact, totalEmployees } = req.body;
-    const tenantId = (req as any).user?.tenantId;
-    const timestamp = new Date().toISOString();
+    const { userId, tenantId, role } = req.user;
+    
+    // Check if user has permission to create subsidiary
+    if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: "You don't have permission to create subsidiaries" });
+      return;
+    }
 
-    const subsidiary = {
-      id: uuidv4(),
-      name,
-      email,
-      address,
-      contact,
-      totalEmployees,
-      tenantId,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    };
+    const subsidiaryData: CreateSubsidiaryInput = req.body;
+    
+    // Validate required fields
+    if (!subsidiaryData.name || !subsidiaryData.email || !subsidiaryData.address || !subsidiaryData.contact) {
+      res.status(400).json({ error: "Name, email, address, and contact are required" });
+      return;
+    }
 
-    await docClient.send(new PutCommand({
-      TableName: "Subsidiaries",
-      Item: subsidiary
-    }));
-
+    const subsidiary = await subsidiariesService.createSubsidiary(subsidiaryData, userId, tenantId);
+    
     res.status(201).json({ data: subsidiary });
   } catch (error) {
-    console.error('Create subsidiary error:', error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error('Error creating subsidiary:', error);
+    res.status(500).json({ error: 'Failed to create subsidiary' });
   }
 };
 
 // Update subsidiary
-const updateSubsidiary: RequestHandler = async (req, res) => {
+const updateSubsidiary: RequestHandler = async (req: any, res) => {
   try {
-    const { name, email, address, contact, totalEmployees } = req.body;
-    const tenantId = (req as any).user?.tenantId;
-    const timestamp = new Date().toISOString();
+    const { userId, tenantId, role } = req.user;
+    
+    // Check if user has permission to update subsidiary
+    if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: "You don't have permission to update subsidiaries" });
+      return;
+    }
 
-    // First verify the subsidiary exists and belongs to the tenant
-    const getResult = await docClient.send(new GetCommand({
-      TableName: "Subsidiaries",
-      Key: { id: req.params.id }
-    }));
-
-    if (!getResult.Item) {
+    const { id } = req.params;
+    const updateData: UpdateSubsidiaryInput = req.body;
+    
+    const updatedSubsidiary = await subsidiariesService.updateSubsidiary(id, updateData, userId, tenantId);
+    
+    if (!updatedSubsidiary) {
       res.status(404).json({ error: "Subsidiary not found" });
       return;
     }
 
-    if (getResult.Item.tenantId !== tenantId) {
-      res.status(403).json({ error: "Access denied" });
-      return;
-    }
-
-    const result = await docClient.send(new UpdateCommand({
-      TableName: "Subsidiaries",
-      Key: { id: req.params.id },
-      UpdateExpression: "set #name = :name, email = :email, address = :address, contact = :contact, totalEmployees = :totalEmployees, updatedAt = :updatedAt",
-      ExpressionAttributeNames: {
-        "#name": "name"
-      },
-      ExpressionAttributeValues: {
-        ":name": name,
-        ":email": email,
-        ":address": address,
-        ":contact": contact,
-        ":totalEmployees": totalEmployees,
-        ":updatedAt": timestamp
-      },
-      ReturnValues: "ALL_NEW"
-    }));
-
-    if (!result.Attributes) {
-      res.status(404).json({ error: "Subsidiary not found" });
-      return;
-    }
-
-    res.json({ data: result.Attributes });
+    res.json({ data: updatedSubsidiary });
   } catch (error) {
     console.error('Update subsidiary error:', error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// Delete subsidiary
-const deleteSubsidiary: RequestHandler = async (req, res) => {
+// Delete subsidiary (soft delete)
+const deleteSubsidiary: RequestHandler = async (req: any, res) => {
   try {
-    const tenantId = (req as any).user?.tenantId;
+    const { userId, tenantId, role } = req.user;
+    
+    // Check if user has permission to delete subsidiary
+    if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: "You don't have permission to delete subsidiaries" });
+      return;
+    }
 
-    // First verify the subsidiary exists and belongs to the tenant
-    const getResult = await docClient.send(new GetCommand({
-      TableName: "Subsidiaries",
-      Key: { id: req.params.id }
-    }));
-
-    if (!getResult.Item) {
+    const { id } = req.params;
+    
+    const success = await subsidiariesService.deleteSubsidiary(id, userId, tenantId);
+    
+    if (!success) {
       res.status(404).json({ error: "Subsidiary not found" });
       return;
     }
-
-    if (getResult.Item.tenantId !== tenantId) {
-      res.status(403).json({ error: "Access denied" });
-      return;
-    }
-
-    await docClient.send(new DeleteCommand({
-      TableName: "Subsidiaries",
-      Key: { id: req.params.id }
-    }));
 
     res.json({ message: "Subsidiary deleted successfully" });
   } catch (error) {
     console.error('Delete subsidiary error:', error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// Restore subsidiary
+const restoreSubsidiary: RequestHandler = async (req: any, res) => {
+  try {
+    const { userId, tenantId } = req.user;
+    const { id } = req.params;
+    
+    const success = await subsidiariesService.restoreSubsidiary(id, userId, tenantId);
+    
+    if (!success) {
+      res.status(404).json({ error: "Subsidiary not found" });
+      return;
+    }
+
+    res.json({ message: "Subsidiary restored successfully" });
+  } catch (error) {
+    console.error('Restore subsidiary error:', error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Hard delete subsidiary (admin only)
+const hardDeleteSubsidiary: RequestHandler = async (req: any, res) => {
+  try {
+    const { tenantId, role } = req.user;
+    const { id } = req.params;
+    
+    if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: "Admin access required" });
+      return;
+    }
+    
+    const success = await subsidiariesService.hardDeleteSubsidiary(id, tenantId);
+    
+    if (!success) {
+      res.status(404).json({ error: "Subsidiary not found" });
+      return;
+    }
+
+    res.json({ message: "Subsidiary permanently deleted" });
+  } catch (error) {
+    console.error('Hard delete subsidiary error:', error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Search subsidiaries
+const searchSubsidiaries: RequestHandler = async (req: any, res) => {
+  try {
+    const { tenantId } = req.user;
+    const { q: searchTerm, limit = 50 } = req.query;
+    
+    if (!searchTerm) {
+      res.status(400).json({ error: "Search term is required" });
+      return;
+    }
+    
+    const subsidiaries = await subsidiariesService.searchSubsidiaries(searchTerm, tenantId, parseInt(limit));
+    
+    res.json({ 
+      data: subsidiaries,
+      total: subsidiaries.length 
+    });
+  } catch (error) {
+    console.error('Search subsidiaries error:', error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Get subsidiaries statistics
+const getSubsidiariesStats: RequestHandler = async (req: any, res) => {
+  try {
+    const { tenantId } = req.user;
+    
+    const stats = await subsidiariesService.getSubsidiariesStats(tenantId);
+    
+    res.json({ data: stats });
+  } catch (error) {
+    console.error('Get subsidiaries stats error:', error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Route definitions
 router.get("/", getAllSubsidiaries);
+router.get("/search", searchSubsidiaries);
+router.get("/stats", getSubsidiariesStats);
 router.get("/:id", getSubsidiaryById);
 router.post("/", createSubsidiary);
 router.put("/:id", updateSubsidiary);
 router.delete("/:id", deleteSubsidiary);
+router.patch("/:id/restore", restoreSubsidiary);
+router.delete("/:id/hard", hardDeleteSubsidiary);
 
 export default router;

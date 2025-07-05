@@ -15,7 +15,7 @@ interface AddNewUserModalProps {
 const AddNewUserModal: React.FC<AddNewUserModalProps> = ({ isOpen, onClose, onUserAdded }) => {
   const currentUser = useAuthStore((s) => s.user);
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
-  const isAdmin = currentUser?.role === 'ADMIN';
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'SuperAdmin';
   
   const getInitialFormData = () => ({
     firstName: '',
@@ -101,7 +101,11 @@ const AddNewUserModal: React.FC<AddNewUserModalProps> = ({ isOpen, onClose, onUs
         onClose(); // close modal
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || err.response?.data?.errorMessage || 'User creation failed');
+      if (err.response?.data?.error?.includes('PhoneNumberIndex')) {
+        setError('Please enter a valid phone number');
+      } else {
+        setError(err.response?.data?.error || err.response?.data?.errorMessage || 'Failed to create user. Please try again.');
+      }
     }
   };
 
@@ -122,7 +126,7 @@ const AddNewUserModal: React.FC<AddNewUserModalProps> = ({ isOpen, onClose, onUs
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40"
       onClick={handleOverlayClick}
     >
-      <div className="bg-white rounded-xl p-8 w-full max-w-lg shadow-lg">
+      <div className="bg-white rounded-xl p-8 w-full max-w-lg shadow-lg max-h-[90vh] overflow-y-auto">
         <h2 className="text-2xl font-bold text-center mb-4">
           {isSuperAdmin ? 'Add New Admin' : 'Add New User'}
         </h2>

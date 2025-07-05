@@ -1,16 +1,33 @@
 import { SidebarItem } from '../types';
+import { useAuthStore } from '../store/useAuthStore';
 
-export const sidebarItems: SidebarItem[] = [
+// Base items that all users can see
+const baseItems: SidebarItem[] = [
   { name: 'Home', path: '/', icon: 'Home' },
   { name: 'Contacts', path: '/contacts', icon: 'Users' },
   { name: 'Leads', path: '/leads', icon: 'UserPlus' },
   { name: 'Deals', path: '/deals', icon: 'Target' },
   { name: 'Tasks', path: '/tasks', icon: 'CheckSquare' },
+];
+
+// Admin-only items
+const adminItems: SidebarItem[] = [
   { name: 'Subsidiaries', path: '/subsidiaries', icon: 'Building' },
   { name: 'Dealers', path: '/dealers', icon: 'Users' },
-  // { name: 'Accounts', path: '/accounts', icon: 'Building2' },
-
 ];
+
+export const getSidebarItems = (): SidebarItem[] => {
+  const user = useAuthStore.getState().user;
+  const role = user?.role?.toUpperCase();
+
+  // If user is a sales rep, only show base items
+  if (role === 'SALES_REP') {
+    return baseItems;
+  }
+
+  // For admin roles and others, show all items
+  return [...baseItems, ...adminItems];
+};
 
 export const chatItems: SidebarItem[] = [
   {
@@ -24,7 +41,7 @@ export const modulesItem: SidebarItem = {
   name: 'Modules',
   path: '/modules',
   icon: 'LayoutGrid',
-  children: sidebarItems
+  children: getSidebarItems()
 };
 
 export const reportsItems: SidebarItem[] = [
@@ -36,7 +53,6 @@ export const reportsItems: SidebarItem[] = [
       { name: 'All Reports', path: '/reports/all', icon: 'FileBarChart' },
       { name: 'Favourites', path: '/reports/favourites', icon: 'Star' },
       { name: 'Scheduled Reports', path: '/reports/scheduled', icon: 'Calendar' },
-
     ]
   }
 ];

@@ -1,7 +1,14 @@
-const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, ScanCommand, GetCommand, PutCommand, UpdateCommand, DeleteCommand } = require("@aws-sdk/lib-dynamodb");
-const readline = require('readline');
+const { DynamoDBClient, ListTablesCommand } = require("@aws-sdk/client-dynamodb");
+const { 
+  DynamoDBDocumentClient, 
+  PutCommand, 
+  GetCommand, 
+  UpdateCommand, 
+  DeleteCommand,
+  ScanCommand
+} = require("@aws-sdk/lib-dynamodb");
 const { v4: uuidv4 } = require('uuid');
+const readline = require('readline');
 
 // Configure client for local DynamoDB
 const client = new DynamoDBClient({
@@ -14,336 +21,359 @@ const client = new DynamoDBClient({
 });
 
 const docClient = DynamoDBDocumentClient.from(client);
-
-// Interface for user input
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
 
-const tables = [
-  "Users", "Contacts", "Leads", "Deals", "Tasks", 
-  "Accounts", "Subsidiaries", "Dealers", "Notifications", 
-  "Meetings", "Reports"
-];
+// Create a new item
+async function createItem(tableName, item) {
+  try {
+    const timestamp = new Date().toISOString();
+    const newItem = {
+      ...item,
+      id: item.id || uuidv4(),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      isDeleted: false
+    };
+
+    await docClient.send(new PutCommand({
+      TableName: tableName,
+      Item: newItem
+    }));
+
+    console.log(`✅ Successfully created item in ${tableName}`);
+    return newItem;
+  } catch (error) {
+    console.error(`❌ Error creating item in ${tableName}:`, error);
+    throw error;
+  }
+}
+
+// Read an item by ID
+async function getItem(tableName, id) {
+  try {
+    const response = await docClient.send(new GetCommand({
+      TableName: tableName,
+      Key: { id }
+    }));
+
+    if (!response.Item) {
+      console.log(`⚠️ No item found in ${tableName} with id: ${id}`);
+      return null;
+    }
+
+    console.log(`✅ Successfully retrieved item from ${tableName}`);
+    return response.Item;
+  } catch (error) {
+    console.error(`❌ Error getting item from ${tableName}:`, error);
+    throw error;
+  }
+}
+
+// Update an item
+async function updateItem(tableName, id, updates) {
+  try {
+    const existingItem = await getItem(tableName, id);
+    if (!existingItem) {
+      throw new Error(`Item with id ${id} not found in ${tableName}`);
+    }
+
+    const updateExpression = [];
+    const expressionAttributeNames = {};
+    const expressionAttributeValues = {};
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (key !== 'id') {
+        updateExpression.push(`#${key} = :${key}`);
+        expressionAttributeNames[`#${key}`] = key;
+        expressionAttributeValues[`:${key}`] = value;
+      }
+    });
+
+    updateExpression.push('#updatedAt = :updatedAt');
+    expressionAttributeNames['#updatedAt'] = 'updatedAt';
+    expressionAttributeValues[':updatedAt'] = new Date().toISOString();
+
+    const response = await docClient.send(new UpdateCommand({
+      TableName: tableName,
+      Key: { id },
+      UpdateExpression: `SET ${updateExpression.join(', ')}`,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
+      ReturnValues: 'ALL_NEW'
+    }));
+
+    console.log(`✅ Successfully updated item in ${tableName}`);
+    return response.Attributes;
+  } catch (error) {
+    console.error(`❌ Error updating item in ${tableName}:`, error);
+    throw error;
+  }
+}
+
+// Soft delete an item
+async function softDeleteItem(tableName, id) {
+  try {
+    const response = await docClient.send(new UpdateCommand({
+      TableName: tableName,
+      Key: { id },
+      UpdateExpression: 'SET #isDeleted = :isDeleted, #deletedAt = :deletedAt',
+      ExpressionAttributeNames: {
+        '#isDeleted': 'isDeleted',
+        '#deletedAt': 'deletedAt'
+      },
+      ExpressionAttributeValues: {
+        ':isDeleted': true,
+        ':deletedAt': new Date().toISOString()
+      },
+      ReturnValues: 'ALL_NEW'
+    }));
+
+    console.log(`✅ Successfully soft deleted item from ${tableName}`);
+    return response.Attributes;
+  } catch (error) {
+    console.error(`❌ Error soft deleting item from ${tableName}:`, error);
+    throw error;
+  }
+}
+
+// Hard delete an item
+async function hardDeleteItem(tableName, id) {
+  try {
+    await docClient.send(new DeleteCommand({
+      TableName: tableName,
+      Key: { id }
+    }));
+
+    console.log(`✅ Successfully deleted item from ${tableName}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error deleting item from ${tableName}:`, error);
+    throw error;
+  }
+}
+
+// List all items in a table
+async function listItems(tableName, filterExpression = null) {
+  try {
+    const params = {
+      TableName: tableName
+    };
+
+    if (filterExpression) {
+      params.FilterExpression = filterExpression;
+      params.ExpressionAttributeValues = {
+        ':false': false
+      };
+    }
+
+    const response = await docClient.send(new ScanCommand(params));
+    console.log(`✅ Successfully retrieved items from ${tableName}`);
+    return response.Items || [];
+  } catch (error) {
+    console.error(`❌ Error listing items from ${tableName}:`, error);
+    throw error;
+  }
+}
+
+// Get list of tables
+async function listTables() {
+  try {
+    const { TableNames } = await client.send(new ListTablesCommand({}));
+    return TableNames || [];
+  } catch (error) {
+    console.error("Error listing tables:", error);
+    return [];
+  }
+}
 
 // Helper function to ask questions
 function ask(question) {
   return new Promise((resolve) => {
-    rl.question(question, resolve);
+    rl.question(question, (answer) => {
+      resolve(answer);
+    });
   });
 }
 
-// Display menu
-function showMenu() {
-  console.log("\n🗃️  Manual CRUD Database Interface");
-  console.log("=====================================");
-  console.log("1. 📖 READ - View records");
-  console.log("2. ➕ CREATE - Add new record");
-  console.log("3. ✏️  UPDATE - Modify existing record");
-  console.log("4. 🗑️  DELETE - Remove record");
-  console.log("5. 📊 STATS - Show table statistics");
-  console.log("6. 🚪 EXIT");
-  console.log("=====================================");
-}
-
-// Show available tables
-function showTables() {
-  console.log("\n📋 Available Tables:");
-  tables.forEach((table, index) => {
-    console.log(`${index + 1}. ${table}`);
-  });
-}
-
-// READ Operations
-async function readRecords() {
-  showTables();
-  const tableChoice = await ask("\n🔍 Select table number to read: ");
-  const tableName = tables[parseInt(tableChoice) - 1];
-  
-  if (!tableName) {
-    console.log("❌ Invalid table selection");
-    return;
-  }
-  
-  try {
-    console.log(`\n📖 Reading from ${tableName}...`);
-    const response = await docClient.send(new ScanCommand({
-      TableName: tableName
-    }));
-    
-    if (response.Items && response.Items.length > 0) {
-      console.log(`\n📊 Found ${response.Items.length} records:\n`);
-      response.Items.forEach((item, index) => {
-        console.log(`${index + 1}. ${JSON.stringify(item, null, 2)}`);
-        console.log("─".repeat(50));
-      });
-    } else {
-      console.log("📭 No records found");
-    }
-  } catch (error) {
-    console.log(`❌ Error reading ${tableName}: ${error.message}`);
-  }
-}
-
-// CREATE Operations
-async function createRecord() {
-  showTables();
-  const tableChoice = await ask("\n➕ Select table number to add record: ");
-  const tableName = tables[parseInt(tableChoice) - 1];
-  
-  if (!tableName) {
-    console.log("❌ Invalid table selection");
-    return;
-  }
-  
-  console.log(`\n📝 Creating new record in ${tableName}`);
-  console.log("Enter field values (press Enter for empty, 'null' for null):");
-  
-  const record = {};
-  
-  // Common fields based on table
-  switch (tableName) {
-    case "Users":
-      record.userId = uuidv4();
-      record.email = await ask("📧 Email: ");
-      record.password = await ask("🔒 Password (will be hashed): ");
-      record.firstName = await ask("👤 First Name: ");
-      record.lastName = await ask("👤 Last Name: ");
-      record.username = await ask("🏷️  Username: ");
-      record.role = await ask("🎭 Role (USER/ADMIN): ") || "USER";
-      record.isDeleted = false;
-      break;
-      
-    case "Contacts":
-      record.id = uuidv4();
-      record.firstName = await ask("👤 First Name: ");
-      record.lastName = await ask("👤 Last Name: ");
-      record.email = await ask("📧 Email: ");
-      record.company = await ask("🏢 Company: ");
-      record.phone = await ask("📞 Phone: ");
-      break;
-      
-    case "Leads":
-      record.id = uuidv4();
-      record.firstName = await ask("👤 First Name: ");
-      record.lastName = await ask("👤 Last Name: ");
-      record.email = await ask("📧 Email: ");
-      record.company = await ask("🏢 Company: ");
-      record.status = await ask("📊 Status (new/contacted/qualified/lost): ") || "new";
-      record.source = await ask("📍 Source: ");
-      break;
-      
-    case "Deals":
-      record.id = uuidv4();
-      record.title = await ask("📋 Deal Title: ");
-      record.amount = parseFloat(await ask("💰 Amount: ")) || 0;
-      record.status = await ask("📊 Status (open/won/lost): ") || "open";
-      record.contactId = await ask("👤 Contact ID: ");
-      break;
-      
-    case "Tasks":
-      record.id = uuidv4();
-      record.title = await ask("📋 Task Title: ");
-      record.description = await ask("📝 Description: ");
-      record.status = await ask("📊 Status (pending/completed): ") || "pending";
-      record.assignedTo = await ask("👤 Assigned To (User ID): ");
-      record.dueDate = await ask("📅 Due Date (YYYY-MM-DD): ");
-      break;
-      
-    default:
-      record.id = uuidv4();
-      record.name = await ask("🏷️  Name: ");
-      record.description = await ask("📝 Description: ");
-  }
-  
-  // Add timestamps
-  record.createdAt = new Date().toISOString();
-  record.updatedAt = new Date().toISOString();
-  
-  try {
-    await docClient.send(new PutCommand({
-      TableName: tableName,
-      Item: record
-    }));
-    
-    console.log("\n✅ Record created successfully!");
-    console.log("📄 Created record:", JSON.stringify(record, null, 2));
-  } catch (error) {
-    console.log(`❌ Error creating record: ${error.message}`);
-  }
-}
-
-// UPDATE Operations
-async function updateRecord() {
-  showTables();
-  const tableChoice = await ask("\n✏️  Select table number to update: ");
-  const tableName = tables[parseInt(tableChoice) - 1];
-  
-  if (!tableName) {
-    console.log("❌ Invalid table selection");
-    return;
-  }
-  
-  // First show existing records
-  console.log(`\n📖 Current records in ${tableName}:`);
-  const scanResponse = await docClient.send(new ScanCommand({
-    TableName: tableName
-  }));
-  
-  if (!scanResponse.Items || scanResponse.Items.length === 0) {
-    console.log("📭 No records found to update");
-    return;
-  }
-  
-  scanResponse.Items.forEach((item, index) => {
-    console.log(`${index + 1}. ID: ${item.id || item.userId || item.email} - ${item.firstName || item.title || item.name || 'Record'}`);
-  });
-  
-  const recordChoice = await ask("\n🎯 Select record number to update: ");
-  const selectedRecord = scanResponse.Items[parseInt(recordChoice) - 1];
-  
-  if (!selectedRecord) {
-    console.log("❌ Invalid record selection");
-    return;
-  }
-  
-  console.log("\n📝 Current record:", JSON.stringify(selectedRecord, null, 2));
-  
-  const field = await ask("\n🏷️  Field name to update: ");
-  const newValue = await ask(`📝 New value for ${field}: `);
-  
-  // Determine the key for the update
-  const key = selectedRecord.id ? { id: selectedRecord.id } : 
-              selectedRecord.userId ? { userId: selectedRecord.userId } :
-              { email: selectedRecord.email };
-  
-  try {
-    await docClient.send(new UpdateCommand({
-      TableName: tableName,
-      Key: key,
-      UpdateExpression: `SET ${field} = :value, updatedAt = :timestamp`,
-      ExpressionAttributeValues: {
-        ':value': newValue,
-        ':timestamp': new Date().toISOString()
-      }
-    }));
-    
-    console.log("✅ Record updated successfully!");
-  } catch (error) {
-    console.log(`❌ Error updating record: ${error.message}`);
-  }
-}
-
-// DELETE Operations
-async function deleteRecord() {
-  showTables();
-  const tableChoice = await ask("\n🗑️  Select table number to delete from: ");
-  const tableName = tables[parseInt(tableChoice) - 1];
-  
-  if (!tableName) {
-    console.log("❌ Invalid table selection");
-    return;
-  }
-  
-  // Show existing records
-  console.log(`\n📖 Current records in ${tableName}:`);
-  const scanResponse = await docClient.send(new ScanCommand({
-    TableName: tableName
-  }));
-  
-  if (!scanResponse.Items || scanResponse.Items.length === 0) {
-    console.log("📭 No records found to delete");
-    return;
-  }
-  
-  scanResponse.Items.forEach((item, index) => {
-    console.log(`${index + 1}. ID: ${item.id || item.userId || item.email} - ${item.firstName || item.title || item.name || 'Record'}`);
-  });
-  
-  const recordChoice = await ask("\n🎯 Select record number to delete: ");
-  const selectedRecord = scanResponse.Items[parseInt(recordChoice) - 1];
-  
-  if (!selectedRecord) {
-    console.log("❌ Invalid record selection");
-    return;
-  }
-  
-  const confirm = await ask(`\n⚠️  Are you sure you want to delete this record? (yes/no): `);
-  if (confirm.toLowerCase() !== 'yes') {
-    console.log("❌ Delete cancelled");
-    return;
-  }
-  
-  const key = selectedRecord.id ? { id: selectedRecord.id } : 
-              selectedRecord.userId ? { userId: selectedRecord.userId } :
-              { email: selectedRecord.email };
-  
-  try {
-    await docClient.send(new DeleteCommand({
-      TableName: tableName,
-      Key: key
-    }));
-    
-    console.log("✅ Record deleted successfully!");
-  } catch (error) {
-    console.log(`❌ Error deleting record: ${error.message}`);
-  }
-}
-
-// Show table statistics
-async function showStats() {
-  console.log("\n📊 Database Statistics");
-  console.log("=====================");
-  
-  for (const tableName of tables) {
-    try {
-      const response = await docClient.send(new ScanCommand({
-        TableName: tableName,
-        Select: "COUNT"
-      }));
-      console.log(`📋 ${tableName}: ${response.Count} records`);
-    } catch (error) {
-      console.log(`📋 ${tableName}: Error - ${error.message}`);
-    }
-  }
-}
-
-// Main menu loop
-async function main() {
-  console.log("🎉 Welcome to Sharp CRM Manual Database CRUD Interface!");
-  
+// Menu-driven interface
+async function showMenu() {
   while (true) {
-    showMenu();
-    const choice = await ask("\n🎯 Select operation (1-6): ");
-    
-    switch (choice) {
-      case '1':
-        await readRecords();
-        break;
-      case '2':
-        await createRecord();
-        break;
-      case '3':
-        await updateRecord();
-        break;
-      case '4':
-        await deleteRecord();
-        break;
-      case '5':
-        await showStats();
-        break;
-      case '6':
-        console.log("👋 Goodbye!");
-        rl.close();
-        return;
-      default:
-        console.log("❌ Invalid choice. Please select 1-6.");
+    console.clear();
+    console.log("\n🗄️  DynamoDB Manager");
+    console.log("==================\n");
+    console.log("1. List All Tables");
+    console.log("2. View Table Contents");
+    console.log("3. Create New Item");
+    console.log("4. Get Item by ID");
+    console.log("5. Update Item");
+    console.log("6. Soft Delete Item");
+    console.log("7. Hard Delete Item");
+    console.log("8. View Active Items");
+    console.log("9. Exit\n");
+
+    const choice = await ask("Enter your choice (1-9): ");
+
+    try {
+      switch (choice) {
+        case "1": {
+          const tables = await listTables();
+          console.log("\nAvailable Tables:");
+          console.log("----------------");
+          tables.forEach((table, index) => {
+            console.log(`${index + 1}. ${table}`);
+          });
+          await ask("\nPress Enter to continue...");
+          break;
+        }
+
+        case "2": {
+          const tables = await listTables();
+          console.log("\nAvailable Tables:");
+          tables.forEach((table, index) => {
+            console.log(`${index + 1}. ${table}`);
+          });
+          const tableIndex = parseInt(await ask("\nSelect table number: ")) - 1;
+          if (tableIndex >= 0 && tableIndex < tables.length) {
+            const items = await listItems(tables[tableIndex]);
+            console.log("\nTable Contents:");
+            console.log("--------------");
+            items.forEach((item, index) => {
+              console.log(`\n${index + 1}. ${JSON.stringify(item, null, 2)}`);
+            });
+          }
+          await ask("\nPress Enter to continue...");
+          break;
+        }
+
+        case "3": {
+          const tables = await listTables();
+          console.log("\nAvailable Tables:");
+          tables.forEach((table, index) => {
+            console.log(`${index + 1}. ${table}`);
+          });
+          const tableIndex = parseInt(await ask("\nSelect table number: ")) - 1;
+          if (tableIndex >= 0 && tableIndex < tables.length) {
+            const tableName = tables[tableIndex];
+            console.log("\nEnter item details (in JSON format):");
+            const itemStr = await ask("");
+            const item = JSON.parse(itemStr);
+            const newItem = await createItem(tableName, item);
+            console.log("\nCreated Item:", JSON.stringify(newItem, null, 2));
+          }
+          await ask("\nPress Enter to continue...");
+          break;
+        }
+
+        case "4": {
+          const tables = await listTables();
+          console.log("\nAvailable Tables:");
+          tables.forEach((table, index) => {
+            console.log(`${index + 1}. ${table}`);
+          });
+          const tableIndex = parseInt(await ask("\nSelect table number: ")) - 1;
+          if (tableIndex >= 0 && tableIndex < tables.length) {
+            const tableName = tables[tableIndex];
+            const id = await ask("Enter item ID: ");
+            const item = await getItem(tableName, id);
+            if (item) {
+              console.log("\nItem found:", JSON.stringify(item, null, 2));
+            }
+          }
+          await ask("\nPress Enter to continue...");
+          break;
+        }
+
+        case "5": {
+          const tables = await listTables();
+          console.log("\nAvailable Tables:");
+          tables.forEach((table, index) => {
+            console.log(`${index + 1}. ${table}`);
+          });
+          const tableIndex = parseInt(await ask("\nSelect table number: ")) - 1;
+          if (tableIndex >= 0 && tableIndex < tables.length) {
+            const tableName = tables[tableIndex];
+            const id = await ask("Enter item ID: ");
+            console.log("\nEnter updates (in JSON format):");
+            const updatesStr = await ask("");
+            const updates = JSON.parse(updatesStr);
+            const updatedItem = await updateItem(tableName, id, updates);
+            console.log("\nUpdated Item:", JSON.stringify(updatedItem, null, 2));
+          }
+          await ask("\nPress Enter to continue...");
+          break;
+        }
+
+        case "6": {
+          const tables = await listTables();
+          console.log("\nAvailable Tables:");
+          tables.forEach((table, index) => {
+            console.log(`${index + 1}. ${table}`);
+          });
+          const tableIndex = parseInt(await ask("\nSelect table number: ")) - 1;
+          if (tableIndex >= 0 && tableIndex < tables.length) {
+            const tableName = tables[tableIndex];
+            const id = await ask("Enter item ID: ");
+            await softDeleteItem(tableName, id);
+          }
+          await ask("\nPress Enter to continue...");
+          break;
+        }
+
+        case "7": {
+          const tables = await listTables();
+          console.log("\nAvailable Tables:");
+          tables.forEach((table, index) => {
+            console.log(`${index + 1}. ${table}`);
+          });
+          const tableIndex = parseInt(await ask("\nSelect table number: ")) - 1;
+          if (tableIndex >= 0 && tableIndex < tables.length) {
+            const tableName = tables[tableIndex];
+            const id = await ask("Enter item ID: ");
+            await hardDeleteItem(tableName, id);
+          }
+          await ask("\nPress Enter to continue...");
+          break;
+        }
+
+        case "8": {
+          const tables = await listTables();
+          console.log("\nAvailable Tables:");
+          tables.forEach((table, index) => {
+            console.log(`${index + 1}. ${table}`);
+          });
+          const tableIndex = parseInt(await ask("\nSelect table number: ")) - 1;
+          if (tableIndex >= 0 && tableIndex < tables.length) {
+            const items = await listItems(tables[tableIndex], "isDeleted = :false");
+            console.log("\nActive Items:");
+            console.log("-------------");
+            items.forEach((item, index) => {
+              console.log(`\n${index + 1}. ${JSON.stringify(item, null, 2)}`);
+            });
+          }
+          await ask("\nPress Enter to continue...");
+          break;
+        }
+
+        case "9": {
+          console.log("\nGoodbye! 👋\n");
+          rl.close();
+          process.exit(0);
+        }
+
+        default: {
+          console.log("\n❌ Invalid choice. Please try again.");
+          await ask("\nPress Enter to continue...");
+        }
+      }
+    } catch (error) {
+      console.error("\n❌ Error:", error.message);
+      await ask("\nPress Enter to continue...");
     }
-    
-    await ask("\n⏸️  Press Enter to continue...");
   }
 }
 
-// Start the application
-main().catch(console.error); 
+// Start the menu
+showMenu(); 

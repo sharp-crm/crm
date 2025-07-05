@@ -1,22 +1,17 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
-// Configure DynamoDB client
+// Configure DynamoDB client for local development
 const clientConfig: any = {
-  region: process.env.AWS_REGION || "us-east-1",
+  region: "us-east-1",
+  endpoint: "http://localhost:8000",
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'fakeMyKeyId',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'fakeSecretAccessKey'
+    accessKeyId: "fakeMyKeyId",
+    secretAccessKey: "fakeSecretAccessKey"
   }
 };
 
-// Use local endpoint if specified (for Docker DynamoDB Local)
-if (process.env.DYNAMODB_ENDPOINT) {
-  clientConfig.endpoint = process.env.DYNAMODB_ENDPOINT;
-  console.log(`🐳 Using local DynamoDB at ${process.env.DYNAMODB_ENDPOINT}`);
-} else {
-  console.log(`☁️ Using AWS DynamoDB in region ${clientConfig.region}`);
-}
+console.log(`🐳 Using local DynamoDB at http://localhost:8000`);
 
 const client = new DynamoDBClient(clientConfig);
 
@@ -38,11 +33,9 @@ export const TABLES = {
   LEADS: "Leads",
   DEALS: "Deals",
   TASKS: "Tasks",
-  ACCOUNTS: "Accounts",
   SUBSIDIARIES: "Subsidiaries",
   DEALERS: "Dealers",
   NOTIFICATIONS: "Notifications",
-  MEETINGS: "Meetings",
   REPORTS: "Reports"
 };
 

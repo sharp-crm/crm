@@ -1,15 +1,9 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Logout from './pages/Logout';
-import Layout from './components/Layout/Layout';
-import ProtectedRoute from './components/ProtectedRoute';
-import { useAuthStore } from './store/useAuthStore';
-import AuthWrapper from './components/AuthWrapper';
-
-// Pages
 import Home from './pages/Home';
 import Leads from './pages/Leads';
 import Contacts from './pages/Contacts';
@@ -18,27 +12,25 @@ import Tasks from './pages/Tasks';
 import Subsidiaries from './pages/Subsidiries';
 import Dealers from './pages/Dealers';
 import Notifications from './pages/Notifications';
-import Personal from './pages/Settings/General/Personal';
-import AccessControl from './pages/AccessControl';
+import Personal from './pages/Settings/Personal';
+import AccessControl from './pages/Settings/AccessControl';
 import EmailIntegration from './pages/Integration/EmailIntegration';
 import TeamChat from './pages/TeamChat';
 import Profile from './pages/Profile';
 import AllReports from './pages/Reports/AllReports';
 import Favourites from './pages/Reports/Favourites';
 import ScheduledReports from './pages/Reports/ScheduledReports';
+import Overview from './pages/Analytics/Overview';
 import LeadAnalytics from './pages/Analytics/LeadAnalytics';
 import DealInsights from './pages/Analytics/DealInsights';
 import ActivityStats from './pages/Analytics/ActivityStats';
-import Overview from './pages/Analytics/Overview';
+import Layout from './components/Layout/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import AuthWrapper from './components/AuthWrapper';
+import Toast from './components/Common/Toast';
 import AllUsers from './pages/AllUsersByDomain';
 
-function App() {
-  const initialize = useAuthStore((s) => s.initializeFromSession);
-
-  useEffect(() => {
-    initialize();
-  }, []);
-
+const App: React.FC = () => {
   return (
     <AuthWrapper>
       <Routes>
@@ -79,8 +71,9 @@ function App() {
           <Route path="analytics/activity" element={<ActivityStats />} />
         </Route>
       </Routes>
+      <Toast />
     </AuthWrapper>
   );
-}
+};
 
 export default App;

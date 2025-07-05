@@ -9,10 +9,8 @@ import tasksRoutes from "./routes/tasks";
 import leadsRoutes from "./routes/leads";
 import dealsRoutes from "./routes/deals";
 import usersRoutes from "./routes/users";
-import accountsRoutes from "./routes/accounts";
 import notificationsRoutes from "./routes/notifications";
 import analyticsRoutes from "./routes/analytics";
-import meetingsRoutes from "./routes/meetings";
 import reportsRoutes from "./routes/reports";
 import { authenticate } from "./middlewares/authenticate";
 import { errorHandler } from "./middlewares/errorHandler";
@@ -53,10 +51,8 @@ app.use("/api/tasks", authenticate, tasksRoutes);
 app.use("/api/leads", authenticate, leadsRoutes);
 app.use("/api/deals", authenticate, dealsRoutes);
 app.use("/api/users", authenticate, usersRoutes);
-app.use("/api/accounts", authenticate, accountsRoutes);
 app.use("/api/notifications", authenticate, notificationsRoutes);
 app.use("/api/analytics", authenticate, analyticsRoutes);
-app.use("/api/meetings", authenticate, meetingsRoutes);
 app.use("/api/reports", authenticate, reportsRoutes);
 
 // 404 handler

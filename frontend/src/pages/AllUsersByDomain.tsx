@@ -33,7 +33,12 @@ const rolePermissions: Record<string, string[]> = {
 
 
 
-const AllUsers: React.FC = () => {
+interface AllUsersProps {
+  hideHeader?: boolean;
+  hideBreadcrumbs?: boolean;
+}
+
+const AllUsers: React.FC<AllUsersProps> = ({ hideHeader = false, hideBreadcrumbs = false }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -107,23 +112,46 @@ const AllUsers: React.FC = () => {
     return acc;
   }, {} as Record<string, User[]>);
 
+  // Define role order
+  const roleOrder = ['SUPER_ADMIN', 'ADMIN', 'SALES_MANAGER', 'SALES_REP'];
+
+  // Sort roles based on the defined order
+  const sortedRoles = Object.keys(groupedUsers).sort((a, b) => {
+    const indexA = roleOrder.indexOf(a);
+    const indexB = roleOrder.indexOf(b);
+    
+    // If both roles are in the order array, sort by their index
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    
+    // If only one role is in the order array, prioritize it
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    
+    // If neither role is in the order array, sort alphabetically
+    return a.localeCompare(b);
+  });
+
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <PageHeader
-          title="All Users"
-          subtitle="List of all registered users grouped by role"
-          breadcrumbs={[{ name: 'Home', path: '/' }, { name: 'Users' }]}
-        />
-        {(currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN') && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            + Add New User
-          </button>
-        )}
-      </div>
+      {!hideHeader && (
+        <div className="flex justify-between items-center mb-6">
+          <PageHeader
+            title="All Users"
+            subtitle="List of all registered users grouped by role"
+            breadcrumbs={hideBreadcrumbs ? [] : [{ name: 'Home', path: '/' }, { name: 'Users' }]}
+          />
+          {(currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'SuperAdmin') && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              + Add New User
+            </button>
+          )}
+        </div>
+      )}
 
       {loading && <p className="text-gray-600">Loading users...</p>}
       {error && <p className="text-red-600">{error}</p>}
@@ -134,7 +162,7 @@ const AllUsers: React.FC = () => {
 
       {!loading && !error && (
         <div className="space-y-8 mt-6">
-          {Object.keys(groupedUsers).map((role) => (
+          {sortedRoles.map((role) => (
             <div key={role}>
               {/* Role Header */}
               <h3 className="text-xl font-semibold text-gray-800 mb-3">
@@ -167,12 +195,8 @@ const AllUsers: React.FC = () => {
                       ))}
                     </div>
 
-                    {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN') && (
+                    {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'SuperAdmin') && (
                       <div className="mt-3 flex gap-4">
-                        {/* Show delete button only if:
-                            1. User is not the currently logged-in user
-                            2. User is not the super admin (john@sharp.com)
-                        */}
                         {currentUser?.userId !== user.id && 
                          user.email !== 'john@sharp.com' && (
                           <button

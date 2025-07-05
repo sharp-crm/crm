@@ -18,7 +18,7 @@ export const generateAccessToken = (payload: TokenPayload): string => {
   return jwt.sign(
     payload,
     JWT_SECRET,
-    { expiresIn: '1h' }
+    { expiresIn: '24h' }
   );
 };
 
