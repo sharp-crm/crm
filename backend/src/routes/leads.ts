@@ -75,7 +75,7 @@ const getLeadById: RequestHandler = async (req: any, res) => {
 // Get leads by owner
 const getLeadsByOwner: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     const { owner } = req.params;
     
     if (!tenantId) {
@@ -83,7 +83,7 @@ const getLeadsByOwner: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const leads = await leadsService.getLeadsByOwner(owner, tenantId);
+    const leads = await leadsService.getLeadsByOwner(owner, tenantId, userId);
     
     res.json({ 
       data: leads,
@@ -98,7 +98,7 @@ const getLeadsByOwner: RequestHandler = async (req: any, res) => {
 // Search leads
 const searchLeads: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     const { q } = req.query;
     
     if (!tenantId) {
@@ -111,7 +111,7 @@ const searchLeads: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const leads = await leadsService.searchLeads(tenantId, q);
+    const leads = await leadsService.searchLeads(tenantId, userId, q);
     
     res.json({ 
       data: leads,
@@ -346,15 +346,14 @@ const hardDeleteLead: RequestHandler = async (req: any, res) => {
 // Get leads statistics
 const getLeadsStats: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     
     if (!tenantId) {
       res.status(400).json({ error: "Tenant ID required" });
       return;
     }
 
-    const stats = await leadsService.getLeadsStats(tenantId);
-    
+    const stats = await leadsService.getLeadsStats(tenantId, userId);
     res.json({ data: stats });
   } catch (error) {
     console.error('Get leads stats error:', error);

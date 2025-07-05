@@ -72,7 +72,7 @@ export interface Deal {
   leadSource: string;
   stage: 'Need Analysis' | 'Value Proposition' | 'Identify Decision Makers' | 'Negotiation/Review' | 'Closed Won' | 'Closed Lost' | 'Closed Lost to Competition';
   amount: number;
-  visibleTo?: string[]; // Changed from required to optional
+  visibleTo: string[]; // Making this required
   
   // Optional fields from AddNewModal  
   description?: string;

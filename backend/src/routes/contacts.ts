@@ -26,7 +26,7 @@ const validateEmail = (email: string) => {
 // Get all contacts for tenant
 const getAllContacts: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId, userId, role } = req.user;
+    const { tenantId, userId } = req.user;
     const includeDeleted = req.query.includeDeleted === 'true';
     
     if (!tenantId) {
@@ -34,7 +34,7 @@ const getAllContacts: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const contacts = await contactsService.getContactsByTenant(tenantId, userId, role, includeDeleted);
+    const contacts = await contactsService.getContactsByTenant(tenantId, userId, includeDeleted);
     
     res.json({ 
       data: contacts,
@@ -50,7 +50,7 @@ const getAllContacts: RequestHandler = async (req: any, res) => {
 // Get contact by ID
 const getContactById: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId, userId, role } = req.user;
+    const { tenantId, userId } = req.user;
     const { id } = req.params;
     
     if (!tenantId) {
@@ -58,10 +58,10 @@ const getContactById: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const contact = await contactsService.getContactById(id, tenantId, userId, role);
+    const contact = await contactsService.getContactById(id, tenantId, userId);
     
     if (!contact) {
-      res.status(404).json({ message: "Contact not found or you don't have permission to view it" });
+      res.status(404).json({ message: "Contact not found" });
       return;
     }
 
@@ -75,7 +75,7 @@ const getContactById: RequestHandler = async (req: any, res) => {
 // Get contacts by owner
 const getContactsByOwner: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     const { owner } = req.params;
     
     if (!tenantId) {
@@ -83,7 +83,7 @@ const getContactsByOwner: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const contacts = await contactsService.getContactsByOwner(owner, tenantId);
+    const contacts = await contactsService.getContactsByOwner(owner, tenantId, userId);
     
     res.json({ 
       data: contacts,
@@ -98,7 +98,7 @@ const getContactsByOwner: RequestHandler = async (req: any, res) => {
 // Search contacts
 const searchContacts: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     const { q } = req.query;
     
     if (!tenantId) {
@@ -111,7 +111,7 @@ const searchContacts: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const contacts = await contactsService.searchContacts(tenantId, q);
+    const contacts = await contactsService.searchContacts(tenantId, userId, q);
     
     res.json({ 
       data: contacts,
@@ -175,7 +175,8 @@ const createContact: RequestHandler = async (req: any, res) => {
       country: req.body.country,
       zipCode: req.body.zipCode,
       description: req.body.description,
-      status: req.body.status
+      status: req.body.status,
+      visibleTo: req.body.visibleTo
     };
 
     const contact = await contactsService.createContact(contactInput, userId, req.user.email, tenantId);
@@ -193,7 +194,7 @@ const createContact: RequestHandler = async (req: any, res) => {
 // Update contact
 const updateContact: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId, userId, role } = req.user;
+    const { tenantId, userId } = req.user;
     const { id } = req.params;
     
     if (!tenantId || !userId) {
@@ -201,16 +202,46 @@ const updateContact: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const contact = await contactsService.updateContact(id, req.body, userId, req.user.email, tenantId, role);
+    // Validate email if provided
+    if (req.body.email && !validateEmail(req.body.email)) {
+      res.status(400).json({ error: "Invalid email format" });
+      return;
+    }
+
+    // Check if email is being changed and if new email already exists
+    if (req.body.email) {
+      const existingContact = await contactsService.getContactByEmail(req.body.email, tenantId);
+      if (existingContact && existingContact.id !== id) {
+        res.status(409).json({ error: "Contact with this email already exists" });
+        return;
+      }
+    }
+
+    const updateInput: UpdateContactInput = {};
     
-    if (!contact) {
-      res.status(404).json({ message: "Contact not found or you don't have permission to update it" });
+    // Only include fields that are provided in the request
+    const updateableFields = [
+      'contactOwner', 'firstName', 'companyName', 'email', 'leadSource',
+      'phone', 'title', 'department', 'street', 'area', 'city', 'state', 
+      'country', 'zipCode', 'description', 'status'
+    ];
+
+    updateableFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateInput[field as keyof UpdateContactInput] = req.body[field];
+      }
+    });
+
+    const updatedContact = await contactsService.updateContact(id, updateInput, userId, req.user.email, tenantId);
+    
+    if (!updatedContact) {
+      res.status(404).json({ error: "Contact not found" });
       return;
     }
 
     res.json({ 
       message: "Contact updated successfully", 
-      data: contact 
+      data: updatedContact 
     });
   } catch (error) {
     console.error('Update contact error:', error);
@@ -302,14 +333,14 @@ const hardDeleteContact: RequestHandler = async (req: any, res) => {
 // Get contacts statistics
 const getContactsStats: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     
     if (!tenantId) {
       res.status(400).json({ error: "Tenant ID required" });
       return;
     }
 
-    const stats = await contactsService.getContactsStats(tenantId);
+    const stats = await contactsService.getContactsStats(tenantId, userId);
     
     res.json({ data: stats });
   } catch (error) {

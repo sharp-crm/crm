@@ -34,7 +34,7 @@ const getAllDeals: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const deals = await dealsService.getDealsByTenant(tenantId, includeDeleted);
+    const deals = await dealsService.getDealsByTenant(tenantId, userId, includeDeleted);
 
     res.json({ 
       data: deals,
@@ -50,7 +50,7 @@ const getAllDeals: RequestHandler = async (req: any, res) => {
 // Get deal by ID
 const getDealById: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     const { id } = req.params;
     
     if (!tenantId) {
@@ -58,7 +58,7 @@ const getDealById: RequestHandler = async (req: any, res) => {
       return;
     }
     
-    const deal = await dealsService.getDealById(id, tenantId);
+    const deal = await dealsService.getDealById(id, tenantId, userId);
     
     if (!deal) {
       res.status(404).json({ message: "Deal not found" });
@@ -69,13 +69,13 @@ const getDealById: RequestHandler = async (req: any, res) => {
   } catch (error) {
     console.error('Get deal error:', error);
     res.status(500).json({ message: "Internal server error" });
-    }
+  }
 };
 
 // Get deals by owner
 const getDealsByOwner: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     const { owner } = req.params;
     
     if (!tenantId) {
@@ -83,7 +83,7 @@ const getDealsByOwner: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const deals = await dealsService.getDealsByOwner(owner, tenantId);
+    const deals = await dealsService.getDealsByOwner(owner, tenantId, userId);
     
     res.json({ 
       data: deals,
@@ -98,7 +98,7 @@ const getDealsByOwner: RequestHandler = async (req: any, res) => {
 // Get deals by stage
 const getDealsByStage: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     const { stage } = req.params;
     
     if (!tenantId) {
@@ -106,7 +106,7 @@ const getDealsByStage: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const deals = await dealsService.getDealsByStage(stage, tenantId);
+    const deals = await dealsService.getDealsByStage(stage, tenantId, userId);
     
     res.json({ 
       data: deals,
@@ -121,7 +121,7 @@ const getDealsByStage: RequestHandler = async (req: any, res) => {
 // Search deals
 const searchDeals: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     const { q } = req.query;
     
     if (!tenantId) {
@@ -134,7 +134,7 @@ const searchDeals: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    const deals = await dealsService.searchDeals(tenantId, q);
+    const deals = await dealsService.searchDeals(tenantId, userId, q);
     
     res.json({ 
       data: deals,
@@ -169,12 +169,29 @@ const createDeal: RequestHandler = async (req: any, res) => {
       return;
     }
 
-    // Validate amount is a number
-    const amount = Number(req.body.amount);
+    // Validate amount is a valid number
+    const amount = parseFloat(req.body.amount);
     if (isNaN(amount) || amount < 0) {
       res.status(400).json({ error: "Amount must be a valid positive number" });
       return;
     }
+
+    // Validate probability if provided
+    if (req.body.probability !== undefined) {
+      const probability = parseFloat(req.body.probability);
+      if (isNaN(probability) || probability < 0 || probability > 100) {
+        res.status(400).json({ error: "Probability must be a number between 0 and 100" });
+        return;
+      }
+    }
+
+    // Validate visibleTo array if provided
+    if (req.body.visibleTo && !Array.isArray(req.body.visibleTo)) {
+      res.status(400).json({ error: "visibleTo must be an array of user IDs" });
+      return;
+    }
+
+    console.log('🔍 Creating deal with body:', req.body);
 
     const dealInput: CreateDealInput = {
       dealOwner: req.body.dealOwner,
@@ -183,12 +200,14 @@ const createDeal: RequestHandler = async (req: any, res) => {
       stage: req.body.stage,
       amount: amount,
       description: req.body.description,
-      account: req.body.account,
-      probability: req.body.probability ? Number(req.body.probability) : undefined,
-      closeDate: req.body.closeDate
+      probability: req.body.probability ? parseFloat(req.body.probability) : undefined,
+      closeDate: req.body.closeDate,
+      visibleTo: req.body.visibleTo || []
     };
 
     const deal = await dealsService.createDeal(dealInput, userId, req.user.email, tenantId);
+
+    console.log('✅ Deal created successfully:', deal.id);
 
     res.status(201).json({ 
       message: "Deal created successfully", 
@@ -196,7 +215,11 @@ const createDeal: RequestHandler = async (req: any, res) => {
     });
   } catch (error) {
     console.error('Create deal error:', error);
-    res.status(500).json({ message: "Internal server error" });
+    if (error instanceof Error) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
 };
 
@@ -231,24 +254,30 @@ const updateDeal: RequestHandler = async (req: any, res) => {
       req.body.probability = probability;
     }
 
+    // Validate visibleTo if provided
+    if (req.body.visibleTo !== undefined && !Array.isArray(req.body.visibleTo)) {
+      res.status(400).json({ error: "visibleTo must be an array of user IDs" });
+      return;
+    }
+
     const updateInput: UpdateDealInput = {};
     
     // Only include fields that are provided in the request
     const updateableFields = [
       'dealOwner', 'dealName', 'leadSource', 'stage', 'amount', 
-      'description', 'account', 'probability', 'closeDate'
+      'description', 'probability', 'closeDate', 'visibleTo'
     ];
 
     updateableFields.forEach(field => {
       if (req.body[field] !== undefined) {
         updateInput[field as keyof UpdateDealInput] = req.body[field];
-    }
+      }
     });
 
     const updatedDeal = await dealsService.updateDeal(id, updateInput, userId, req.user.email, tenantId);
     
     if (!updatedDeal) {
-      res.status(404).json({ error: "Deal not found" });
+      res.status(404).json({ error: "Deal not found or you don't have permission to update it" });
       return;
     }
 
@@ -258,7 +287,11 @@ const updateDeal: RequestHandler = async (req: any, res) => {
     });
   } catch (error) {
     console.error('Update deal error:', error);
-    res.status(500).json({ message: "Internal server error" });
+    if (error instanceof Error) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
 };
 
@@ -273,6 +306,13 @@ const deleteDeal: RequestHandler = async (req: any, res) => {
       return;
     }
 
+    // First check if deal exists and user has access
+    const deal = await dealsService.getDealById(id, tenantId, userId);
+    if (!deal) {
+      res.status(404).json({ error: "Deal not found or you don't have permission to delete it" });
+      return;
+    }
+
     const success = await dealsService.deleteDeal(id, userId, req.user.email, tenantId);
     
     if (!success) {
@@ -283,7 +323,11 @@ const deleteDeal: RequestHandler = async (req: any, res) => {
     res.json({ message: "Deal deleted successfully" });
   } catch (error) {
     console.error('Delete deal error:', error);
-    res.status(500).json({ message: "Internal server error" });
+    if (error instanceof Error) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
 };
 
@@ -346,14 +390,14 @@ const hardDeleteDeal: RequestHandler = async (req: any, res) => {
 // Get deals statistics
 const getDealsStats: RequestHandler = async (req: any, res) => {
   try {
-    const { tenantId } = req.user;
+    const { tenantId, userId } = req.user;
     
     if (!tenantId) {
       res.status(400).json({ error: "Tenant ID required" });
       return;
     }
 
-    const stats = await dealsService.getDealsStats(tenantId);
+    const stats = await dealsService.getDealsStats(tenantId, userId);
     
     res.json({ data: stats });
   } catch (error) {

@@ -56,7 +56,7 @@ const EditDealModal: React.FC<EditDealModalProps> = ({ isOpen, onClose, deal, on
     setError(null);
 
     try {
-      await dealsApi.update(deal.id, {
+      const updatedDeal = await dealsApi.update(deal.id, {
         dealOwner: formData.dealOwner,
         dealName: formData.dealName,
         leadSource: formData.leadSource,
@@ -65,7 +65,7 @@ const EditDealModal: React.FC<EditDealModalProps> = ({ isOpen, onClose, deal, on
         probability: parseFloat(formData.probability) || 0,
         closeDate: formData.closeDate,
         description: formData.description,
-        visibleTo: formData.visibleTo
+        visibleTo: formData.visibleTo.length > 0 ? formData.visibleTo : [] // Ensure empty array if no users selected
       });
 
       if (onSuccess) {
@@ -73,7 +73,8 @@ const EditDealModal: React.FC<EditDealModalProps> = ({ isOpen, onClose, deal, on
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update deal');
+      console.error('Error updating deal:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update deal. Please check your input and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -93,17 +94,24 @@ const EditDealModal: React.FC<EditDealModalProps> = ({ isOpen, onClose, deal, on
   if (!deal) return null;
 
   return (
-    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+    <Dialog 
+      open={isOpen} 
+      onClose={onClose} 
+      className="relative z-50"
+    >
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="fixed inset-0 flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+        <Dialog.Panel className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <Dialog.Title className="text-xl font-semibold text-gray-900">
               Edit Deal
             </Dialog.Title>
             <button
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
               className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <Icons.X className="w-5 h-5 text-gray-500" />

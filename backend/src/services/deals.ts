@@ -21,6 +21,9 @@ export interface Deal {
   probability?: number;
   closeDate?: string;
   
+  // Visibility field
+  visibleTo: string[]; // Making this required but can be empty array
+  
   // Auditing fields
   createdBy: string;
   createdAt: string;
@@ -40,9 +43,9 @@ export interface CreateDealInput {
   stage: string;
   amount: number;
   description?: string;
-  account?: string;
   probability?: number;
   closeDate?: string;
+  visibleTo?: string[];
 }
 
 export interface UpdateDealInput {
@@ -52,9 +55,9 @@ export interface UpdateDealInput {
   stage?: string;
   amount?: number;
   description?: string;
-  account?: string;
   probability?: number;
   closeDate?: string;
+  visibleTo?: string[];
 }
 
 export class DealsService {
@@ -62,21 +65,41 @@ export class DealsService {
 
   // Create a new deal
   async createDeal(input: CreateDealInput, userId: string, userEmail: string, tenantId: string): Promise<Deal> {
+    console.log('📝 Creating deal with input:', { ...input, userId, tenantId });
+    
     const timestamp = new Date().toISOString();
     const dealId = uuidv4();
 
+    // Ensure numeric fields are numbers and not strings
+    const amount = Number(input.amount) || 0;
+    const probability = input.probability !== undefined ? Number(input.probability) : this.getDefaultProbability(input.stage);
+
+    // Validate amount is a number
+    if (isNaN(amount)) {
+      throw new Error('Amount must be a valid number');
+    }
+
+    // Validate probability is a number between 0 and 100
+    if (probability !== undefined && (isNaN(probability) || probability < 0 || probability > 100)) {
+      throw new Error('Probability must be a number between 0 and 100');
+    }
+
+    // Ensure visibleTo is an array
+    const visibleTo = Array.isArray(input.visibleTo) ? input.visibleTo : (input.visibleTo ? [input.visibleTo] : []);
+
+    // Create deal object with required fields
     const deal: Deal = {
       id: dealId,
       dealOwner: input.dealOwner,
       dealName: input.dealName,
       leadSource: input.leadSource,
       stage: input.stage,
-      amount: input.amount,
-      description: input.description,
-      account: input.account || 'Unknown',
-      value: input.amount, // Set value same as amount for backward compatibility
-      probability: input.probability || this.getDefaultProbability(input.stage),
+      amount: amount,
+      value: amount,
+      probability: probability,
+      description: input.description || '',
       closeDate: input.closeDate || this.getDefaultCloseDate(),
+      visibleTo: visibleTo,
       createdBy: userEmail,
       createdAt: timestamp,
       updatedBy: userEmail,
@@ -86,13 +109,20 @@ export class DealsService {
       tenantId
     };
 
-    await docClient.send(new PutCommand({
-      TableName: this.tableName,
-      Item: deal,
-      ConditionExpression: 'attribute_not_exists(id)'
-    }));
+    console.log('💾 Saving deal:', JSON.stringify(deal, null, 2));
 
-    return deal;
+    try {
+      await docClient.send(new PutCommand({
+        TableName: this.tableName,
+        Item: deal,
+        ConditionExpression: 'attribute_not_exists(id)'
+      }));
+
+      return deal;
+    } catch (error) {
+      console.error('Error saving deal:', error);
+      throw error;
+    }
   }
 
   // Get default probability based on stage
@@ -116,14 +146,20 @@ export class DealsService {
     return date.toISOString().split('T')[0];
   }
 
-  // Get deal by ID (with tenant and soft delete check)
-  async getDealById(id: string, tenantId: string): Promise<Deal | null> {
+  // Get deal by ID (with tenant, visibility and soft delete check)
+  async getDealById(id: string, tenantId: string, userId: string): Promise<Deal | null> {
     const result = await docClient.send(new GetCommand({
       TableName: this.tableName,
       Key: { id }
     }));
 
-    if (!result.Item || result.Item.tenantId !== tenantId || result.Item.isDeleted) {
+    if (!result.Item || 
+        result.Item.tenantId !== tenantId || 
+        result.Item.isDeleted ||
+        (result.Item.visibleTo && 
+         result.Item.visibleTo.length > 0 && 
+         !result.Item.visibleTo.includes(userId) && 
+         result.Item.userId !== userId)) {
       return null;
     }
 
@@ -131,31 +167,40 @@ export class DealsService {
   }
 
   // Get all deals for a tenant (excluding soft deleted)
-  async getDealsByTenant(tenantId: string, includeDeleted = false): Promise<Deal[]> {
+  async getDealsByTenant(tenantId: string, userId: string, includeDeleted = false): Promise<Deal[]> {
+    console.log('🔍 Getting deals by tenant:', { tenantId, userId, includeDeleted });
+    
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'TenantIdIndex',
       KeyConditionExpression: 'tenantId = :tenantId',
-      FilterExpression: includeDeleted ? undefined : 'isDeleted = :isDeleted',
+      FilterExpression: includeDeleted 
+        ? '(attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)'
+        : 'isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
       ExpressionAttributeValues: {
         ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
         ...(includeDeleted ? {} : { ':isDeleted': false })
       }
     }));
 
+    console.log('📊 Found deals:', result.Items?.length);
     return (result.Items || []) as Deal[];
   }
 
   // Get deals by owner
-  async getDealsByOwner(dealOwner: string, tenantId: string): Promise<Deal[]> {
+  async getDealsByOwner(dealOwner: string, tenantId: string, userId: string): Promise<Deal[]> {
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'DealOwnerIndex',
       KeyConditionExpression: 'dealOwner = :dealOwner',
-      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted',
+      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
       ExpressionAttributeValues: {
         ':dealOwner': dealOwner,
         ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
         ':isDeleted': false
       }
     }));
@@ -164,15 +209,17 @@ export class DealsService {
   }
 
   // Get deals by stage
-  async getDealsByStage(stage: string, tenantId: string): Promise<Deal[]> {
+  async getDealsByStage(stage: string, tenantId: string, userId: string): Promise<Deal[]> {
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'StageIndex',
       KeyConditionExpression: 'stage = :stage',
-      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted',
+      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
       ExpressionAttributeValues: {
         ':stage': stage,
         ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
         ':isDeleted': false
       }
     }));
@@ -181,14 +228,16 @@ export class DealsService {
   }
 
   // Search deals
-  async searchDeals(tenantId: string, query: string): Promise<Deal[]> {
+  async searchDeals(tenantId: string, userId: string, query: string): Promise<Deal[]> {
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'TenantIdIndex',
       KeyConditionExpression: 'tenantId = :tenantId',
-      FilterExpression: 'isDeleted = :isDeleted AND (contains(dealName, :query) OR contains(dealOwner, :query) OR contains(account, :query))',
+      FilterExpression: 'isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId) AND (contains(dealName, :query) OR contains(dealOwner, :query))',
       ExpressionAttributeValues: {
         ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
         ':isDeleted': false,
         ':query': query
       }
@@ -200,7 +249,7 @@ export class DealsService {
   // Update deal
   async updateDeal(id: string, input: UpdateDealInput, userId: string, userEmail: string, tenantId: string): Promise<Deal | null> {
     // First check if deal exists and belongs to tenant
-    const existingDeal = await this.getDealById(id, tenantId);
+    const existingDeal = await this.getDealById(id, tenantId, userId);
     if (!existingDeal) {
       return null;
     }
@@ -348,31 +397,62 @@ export class DealsService {
     }
   }
 
-  // Get deals statistics
-  async getDealsStats(tenantId: string): Promise<any> {
-    const deals = await this.getDealsByTenant(tenantId);
+  // Get deals stats for analytics
+  async getDealsStats(tenantId: string, userId: string): Promise<{
+    total: number;
+    byStage: Record<string, number>;
+    bySource: Record<string, number>;
+    totalValue: number;
+    avgValue: number;
+    recentCount: number;
+  }> {
+    const result = await docClient.send(new QueryCommand({
+      TableName: this.tableName,
+      IndexName: 'TenantIdIndex',
+      KeyConditionExpression: 'tenantId = :tenantId',
+      FilterExpression: 'isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
+      ExpressionAttributeValues: {
+        ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
+        ':isDeleted': false
+      }
+    }));
+
+    const deals = result.Items || [];
     
-    const stats = {
+    // Calculate statistics
+    const byStage: Record<string, number> = {};
+    const bySource: Record<string, number> = {};
+    let totalValue = 0;
+    let recentCount = 0;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    deals.forEach(deal => {
+      // Count by stage
+      byStage[deal.stage] = (byStage[deal.stage] || 0) + 1;
+      
+      // Count by source
+      bySource[deal.leadSource] = (bySource[deal.leadSource] || 0) + 1;
+      
+      // Sum total value
+      totalValue += deal.amount || 0;
+      
+      // Count recent deals
+      if (new Date(deal.createdAt) >= thirtyDaysAgo) {
+        recentCount++;
+      }
+    });
+
+    return {
       total: deals.length,
-      totalValue: deals.reduce((sum, deal) => sum + deal.amount, 0),
-      avgValue: deals.length > 0 ? deals.reduce((sum, deal) => sum + deal.amount, 0) / deals.length : 0,
-      avgProbability: deals.length > 0 ? deals.reduce((sum, deal) => sum + (deal.probability || 0), 0) / deals.length : 0,
-      expectedValue: deals.reduce((sum, deal) => sum + (deal.amount * (deal.probability || 0) / 100), 0),
-      byStage: {} as Record<string, number>,
-      byOwner: {} as Record<string, number>
+      byStage,
+      bySource,
+      totalValue,
+      avgValue: deals.length > 0 ? totalValue / deals.length : 0,
+      recentCount
     };
-
-    // Group by stage
-    deals.forEach(deal => {
-      stats.byStage[deal.stage] = (stats.byStage[deal.stage] || 0) + 1;
-    });
-
-    // Group by owner
-    deals.forEach(deal => {
-      stats.byOwner[deal.dealOwner] = (stats.byOwner[deal.dealOwner] || 0) + 1;
-    });
-
-    return stats;
   }
 }
 

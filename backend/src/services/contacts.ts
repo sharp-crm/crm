@@ -30,6 +30,9 @@ export interface Contact {
   description?: string;
   status?: string;
   
+  // Visibility field
+  visibleTo?: string[];
+  
   // Auditing fields
   createdBy: string;
   createdAt: string;
@@ -40,7 +43,6 @@ export interface Contact {
   deletedAt?: string;
   userId: string;
   tenantId: string;
-  visibleTo?: string[];
 }
 
 export interface CreateContactInput {
@@ -91,11 +93,6 @@ export class ContactsService {
     const timestamp = new Date().toISOString();
     const contactId = uuidv4();
 
-    // Ensure visibleTo is properly initialized
-    const visibleTo = input.visibleTo && input.visibleTo.length > 0 
-      ? input.visibleTo 
-      : [userId]; // If no visibility is set, make it visible only to the creator
-
     const contact: Contact = {
       id: contactId,
       contactOwner: input.contactOwner,
@@ -114,7 +111,7 @@ export class ContactsService {
       zipCode: input.zipCode,
       description: input.description,
       status: input.status || 'Active',
-      visibleTo: visibleTo,
+      visibleTo: input.visibleTo || [],
       createdBy: userEmail,
       createdAt: timestamp,
       updatedBy: userEmail,
@@ -134,7 +131,7 @@ export class ContactsService {
   }
 
   // Get contact by ID (with tenant and soft delete check)
-  async getContactById(id: string, tenantId: string, userId?: string, userRole?: string): Promise<Contact | null> {
+  async getContactById(id: string, tenantId: string, userId: string): Promise<Contact | null> {
     const result = await docClient.send(new GetCommand({
       TableName: this.tableName,
       Key: { id }
@@ -145,72 +142,59 @@ export class ContactsService {
     }
 
     const contact = result.Item as Contact;
-
-    // If userId and userRole are provided, check visibility permissions
-    if (userId && userRole) {
-      // Admins and super admins can see all contacts
-      if (userRole === 'admin' || userRole === 'superadmin') {
-        return contact;
-      }
-      
-      // Sales managers can see all contacts
-      if (userRole === 'manager') {
-        return contact;
-      }
-      
-      // For other roles (e.g. sales_rep), check visibility
-      // User must be in visibleTo list or be the owner
-      if (!contact.visibleTo?.includes(userId) && contact.userId !== userId) {
-        return null;
-      }
+    
+    // Check visibility: visible if no visibleTo array, empty array, or user is in the list, or user created it
+    if (contact.visibleTo && contact.visibleTo.length > 0 && 
+        !contact.visibleTo.includes(userId) && contact.userId !== userId) {
+      return null;
     }
 
     return contact;
   }
 
   // Get all contacts for a tenant (excluding soft deleted)
-  async getContactsByTenant(tenantId: string, userId: string, userRole: string, includeDeleted = false): Promise<Contact[]> {
+  async getContactsByTenant(tenantId: string, userId: string, includeDeleted = false): Promise<Contact[]> {
+    console.log('🔍 getContactsByTenant called with:', { tenantId, userId, includeDeleted });
+    
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'TenantIdIndex',
       KeyConditionExpression: 'tenantId = :tenantId',
-      FilterExpression: includeDeleted ? undefined : 'isDeleted = :isDeleted',
+      FilterExpression: includeDeleted 
+        ? '(attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)'
+        : 'isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
       ExpressionAttributeValues: {
         ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
         ...(includeDeleted ? {} : { ':isDeleted': false })
       }
     }));
 
-    const contacts = (result.Items || []) as Contact[];
-    
-    // Filter based on role and visibility
-    return contacts.filter(contact => {
-      // Admins and super admins can see all contacts
-      if (userRole === 'admin' || userRole === 'superadmin') {
-        return true;
-      }
-      
-      // Sales managers can see all contacts
-      if (userRole === 'manager') {
-        return true;
-      }
-      
-      // For other roles (e.g. sales_rep), check visibility
-      // If visibleTo is set, user must be in the list or be the owner
-      return contact.visibleTo?.includes(userId) || contact.userId === userId;
-    });
+    console.log('📊 Raw DynamoDB result:', result.Items?.length, 'items');
+    console.log('📋 Items:', result.Items?.map(item => ({
+      id: item.id,
+      firstName: item.firstName,
+      visibleTo: item.visibleTo,
+      userId: item.userId,
+      createdBy: item.createdBy
+    })));
+
+    return (result.Items || []) as Contact[];
   }
 
   // Get contacts by owner
-  async getContactsByOwner(contactOwner: string, tenantId: string): Promise<Contact[]> {
+  async getContactsByOwner(contactOwner: string, tenantId: string, userId: string): Promise<Contact[]> {
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'ContactOwnerIndex',
       KeyConditionExpression: 'contactOwner = :contactOwner',
-      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted',
+      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
       ExpressionAttributeValues: {
         ':contactOwner': contactOwner,
         ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
         ':isDeleted': false
       }
     }));
@@ -219,16 +203,19 @@ export class ContactsService {
   }
 
   // Get contact by email
-  async getContactByEmail(email: string, tenantId: string): Promise<Contact | null> {
+  async getContactByEmail(email: string, tenantId: string, userId?: string): Promise<Contact | null> {
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'EmailIndex',
       KeyConditionExpression: 'email = :email',
-      FilterExpression: 'tenantId = :tenantId AND isDeleted = :isDeleted',
+      FilterExpression: userId 
+        ? 'tenantId = :tenantId AND isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)'
+        : 'tenantId = :tenantId AND isDeleted = :isDeleted',
       ExpressionAttributeValues: {
         ':email': email,
         ':tenantId': tenantId,
-        ':isDeleted': false
+        ':isDeleted': false,
+        ...(userId ? { ':userId': userId, ':zero': 0 } : {})
       }
     }));
 
@@ -237,20 +224,11 @@ export class ContactsService {
   }
 
   // Update contact
-  async updateContact(id: string, input: UpdateContactInput, userId: string, userEmail: string, tenantId: string, userRole: string): Promise<Contact | null> {
+  async updateContact(id: string, input: UpdateContactInput, userId: string, userEmail: string, tenantId: string): Promise<Contact | null> {
     // First check if contact exists and belongs to tenant
-    const existingContact = await this.getContactById(id, tenantId);
+    const existingContact = await this.getContactById(id, tenantId, userId);
     if (!existingContact) {
       return null;
-    }
-
-    // Check if user has permission to update the contact
-    if (userRole !== 'admin' && userRole !== 'superadmin' && userRole !== 'manager') {
-      if (existingContact.visibleTo && existingContact.visibleTo.length > 0) {
-        if (!existingContact.visibleTo.includes(userId) && existingContact.userId !== userId) {
-          return null; // User doesn't have permission to update this contact
-        }
-      }
     }
 
     const timestamp = new Date().toISOString();
@@ -374,14 +352,16 @@ export class ContactsService {
   }
 
   // Search contacts by various criteria
-  async searchContacts(tenantId: string, searchTerm: string): Promise<Contact[]> {
+  async searchContacts(tenantId: string, userId: string, searchTerm: string): Promise<Contact[]> {
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'TenantIdIndex',
       KeyConditionExpression: 'tenantId = :tenantId',
-      FilterExpression: 'isDeleted = :isDeleted AND (contains(firstName, :searchTerm) OR contains(companyName, :searchTerm) OR contains(email, :searchTerm))',
+      FilterExpression: 'isDeleted = :isDeleted AND (attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId) AND (contains(firstName, :searchTerm) OR contains(companyName, :searchTerm) OR contains(email, :searchTerm))',
       ExpressionAttributeValues: {
         ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0,
         ':isDeleted': false,
         ':searchTerm': searchTerm
       }
@@ -391,7 +371,7 @@ export class ContactsService {
   }
 
   // Get contacts stats for analytics
-  async getContactsStats(tenantId: string): Promise<{
+  async getContactsStats(tenantId: string, userId: string): Promise<{
     total: number;
     active: number;
     deleted: number;
@@ -402,8 +382,11 @@ export class ContactsService {
       TableName: this.tableName,
       IndexName: 'TenantIdIndex',
       KeyConditionExpression: 'tenantId = :tenantId',
+      FilterExpression: '(attribute_not_exists(visibleTo) OR size(visibleTo) = :zero OR contains(visibleTo, :userId) OR userId = :userId)',
       ExpressionAttributeValues: {
-        ':tenantId': tenantId
+        ':tenantId': tenantId,
+        ':userId': userId,
+        ':zero': 0
       }
     }));
 

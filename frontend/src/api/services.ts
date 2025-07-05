@@ -93,7 +93,7 @@ export interface Deal extends Omit<DealType, 'stage'> {
   closeDate?: string;
   
   // Visibility field
-  visibleTo?: string[];
+  visibleTo: string[]; // Making this required but can be empty array
   
   // Backward compatibility fields
   name?: string; // maps to dealName
@@ -273,7 +273,17 @@ export const dealsApi = {
     }
   },
 
-  create: async (deal: Omit<Deal, 'id' | 'tenantId' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'isDeleted' | 'userId' | 'value' | 'name' | 'owner'>): Promise<Deal> => {
+  create: async (deal: {
+    dealOwner: string;
+    dealName: string;
+    leadSource: string;
+    stage: string;
+    amount: number;
+    description?: string;
+    probability?: number;
+    closeDate?: string;
+    visibleTo: string[];
+  }): Promise<Deal> => {
     try {
       const response = await API.post<ApiResponse<Deal>>('/deals', deal);
       return response.data.data;
@@ -532,6 +542,9 @@ export interface Dealer {
   email: string;
   phone: string;
   company: string;
+  status: string;
+  territory: string;
+  location: string;
   visibleTo?: string[];
   createdBy: string;
   createdAt: string;
