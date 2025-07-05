@@ -65,8 +65,6 @@ export class DealsService {
 
   // Create a new deal
   async createDeal(input: CreateDealInput, userId: string, userEmail: string, tenantId: string): Promise<Deal> {
-    console.log('📝 Creating deal with input:', { ...input, userId, tenantId });
-    
     const timestamp = new Date().toISOString();
     const dealId = uuidv4();
 
@@ -109,8 +107,6 @@ export class DealsService {
       tenantId
     };
 
-    console.log('💾 Saving deal:', JSON.stringify(deal, null, 2));
-
     try {
       await docClient.send(new PutCommand({
         TableName: this.tableName,
@@ -120,7 +116,6 @@ export class DealsService {
 
       return deal;
     } catch (error) {
-      console.error('Error saving deal:', error);
       throw error;
     }
   }
@@ -168,8 +163,6 @@ export class DealsService {
 
   // Get all deals for a tenant (excluding soft deleted)
   async getDealsByTenant(tenantId: string, userId: string, includeDeleted = false): Promise<Deal[]> {
-    console.log('🔍 Getting deals by tenant:', { tenantId, userId, includeDeleted });
-    
     const result = await docClient.send(new QueryCommand({
       TableName: this.tableName,
       IndexName: 'TenantIdIndex',
@@ -185,7 +178,6 @@ export class DealsService {
       }
     }));
 
-    console.log('📊 Found deals:', result.Items?.length);
     return (result.Items || []) as Deal[];
   }
 

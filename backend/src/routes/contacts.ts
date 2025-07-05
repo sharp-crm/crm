@@ -210,7 +210,7 @@ const updateContact: RequestHandler = async (req: any, res) => {
 
     // Check if email is being changed and if new email already exists
     if (req.body.email) {
-      const existingContact = await contactsService.getContactByEmail(req.body.email, tenantId);
+      const existingContact = await contactsService.getContactByEmail(req.body.email, tenantId, userId);
       if (existingContact && existingContact.id !== id) {
         res.status(409).json({ error: "Contact with this email already exists" });
         return;
@@ -223,7 +223,7 @@ const updateContact: RequestHandler = async (req: any, res) => {
     const updateableFields = [
       'contactOwner', 'firstName', 'companyName', 'email', 'leadSource',
       'phone', 'title', 'department', 'street', 'area', 'city', 'state', 
-      'country', 'zipCode', 'description', 'status'
+      'country', 'zipCode', 'description', 'status', 'visibleTo'
     ];
 
     updateableFields.forEach(field => {
